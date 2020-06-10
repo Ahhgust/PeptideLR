@@ -7,7 +7,7 @@ which in turn is based on the set theoretic (semicontinuous) likelihood ratio as
 
 The basic premise is that there is evidence (*E*)
 
-<br>
+
 ![\Large LR=\frac{Pr(E|H1}{2a}](https://latex.codecogs.com/svg.latex?LR%3D%5Cfrac%7BPr(E|H_1)%7D%7BPr(E|H_2)%7D)
 
 
