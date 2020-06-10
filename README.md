@@ -10,8 +10,15 @@ For example, one hypothesis (*H<sub>1</sub>*) might be that the evidence is from
 
 ![\Large LR=\frac{Pr(E|H1}{2a}](https://latex.codecogs.com/svg.latex?LR%3D%5Cfrac%7BPr(E|H_1)%7D%7BPr(E|H_2)%7D)
 
-The evidence (*E*) is, in this case, some set of peptide markers. <br>
-The peptides in question are assumed to have been derived from some set of proteins, proteins that have been in turn digested with some enzyme like [trypsin](https://en.wikipedia.org/wiki/Trypsin)
+The evidence (*E*) is, in this case, some set of peptide markers. <br><br>
+In this approach all peptide variations that are considered are those that derive from changes that are genetic. Namely, that there is some set of alleles (in DNA) that give rise to some specific peptide form. Even with this constraint, applying a LR to peptides requires some modifications and extensions from that of Curran et al. <br> Namely
+* Peptides need not be independent
+  * The same peptide may overlap multiple SNP sites
+  * Two peptides may be adjacent, or more generally may be in genetic linkage, thus they may convey redundant information
+  
+
+The peptides in question are assumed to have been derived from some set of proteins, proteins that have been in turn digested with some enzyme like [trypsin](https://en.wikipedia.org/wiki/Trypsin). <br>
+The above formulation is assessed by considering alleles
 
 
 
