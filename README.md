@@ -1,5 +1,8 @@
 #
 
+peptideLR.py can be used to estimate a semicontinuous likelihood ratio from peptide alleles. <br>
+It is designed based on [LoComatioN](https://doi.org/10.1016/j.forsciint.2006.04.016) of Gill et al., <br>
+which in turn is based on the set theoretic (semicontinuous) likelihood ratio as per [Curran et al](https://doi.org/10.1016/j.forsciint.2004.04.077) <br>
 
 # Quick start
 <br>
