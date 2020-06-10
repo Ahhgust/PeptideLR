@@ -6,7 +6,7 @@ which in turn is based on the set theoretic (semicontinuous) likelihood ratio as
 <br>
 
 <p align="center">
-![\Large LR=\frac{Pr(E|H1}{2a}](https://latex.codecogs.com/svg.latex?LR%3D%5Cfrac%7BPr(E|H_1)%7D%7BPr(E|H_2)%7D)
+<![\Large LR=\frac{Pr(E|H1}{2a}](https://latex.codecogs.com/svg.latex?LR%3D%5Cfrac%7BPr(E|H_1)%7D%7BPr(E|H_2)%7D)>
 </p>
 
 
