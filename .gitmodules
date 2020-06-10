@@ -1,0 +1,3 @@
+[submodule "protengine"]
+	path = protengine
+	url = https://github.com/Benjamin-Crysup/protengine.git
