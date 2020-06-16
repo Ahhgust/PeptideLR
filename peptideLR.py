@@ -445,10 +445,21 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   #note: if an individual has none of the peptides, they are NOT in ww
   ww = dict() # who has what. associates an individual with the peptides they have
 
+  global SUFFIX_QUERY_RESULTS
+  global SUFFIX_QUERY
+  global SUFFIX_QUERY_ARRAY
+  # optimization: I cache queries. just the last one.
+  # this lets me keep the previous query, and recycle the search results.
+  if SUFFIX_QUERY is None or peptides != SUFFIX_QUERY or SUFFIX_QUERY_ARRAY != suffixarrayObject:
+    SUFFIX_QUERY_RESULTS = suffixarrayObject.findOwners(peptides)
+    SUFFIX_QUERY = peptides
+    SUFFIX_QUERY_ARRAY = suffixarrayObject
+
   # idx is a list of lists (integers).
   # whos is a list of strings (sample IDs)
   # the inner list's integers are indexes into whos
-  res = suffixarrayObject.findOwners(peptides)
+#  res = suffixarrayObject.findOwners(peptides)
+  res = SUFFIX_QUERY_RESULTS
   idx = res[0]
   whos = res[1]
   nPeps = len(peptides)
@@ -504,6 +515,7 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
     s = "0" * len(peptides)
     hotDict[s] = leftovers
 
+    
   return(hotDict, nSamps)
 
 def readSingleColumnFile(f, column2grab=1, sep="\t", header=False, callback=None):
@@ -704,7 +716,7 @@ def getAllDiplotypes(saObject, peptides):
 
   return d
 
-def crossValidate(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, state, nCross=1):
+def crossValidate(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, state, nCross=1, computeDenominator=True):
   """
   Runs leave-one-out cross-validation on a suffix array (internal)
   Take a list of *alleles* detected from some set of peptides (a panel)
@@ -738,13 +750,20 @@ def crossValidate(saObject, alleles, peptides, theta, dropoutRate, dropinRate, n
       kHaps.extend(allHaps[person])
 
 
-    e = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=nCross, knownHaps = [], excludeList= ashap)
-    s = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=0, knownHaps = kHaps, excludeList=[])
 
-    
-    for tup in e.keys():
-      print(",".join(peeps), tup[0], tup[1], e[tup], s[tup], theta, str(state), sep="\t")
-      
+    if computeDenominator:
+      e = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=nCross, knownHaps = [], excludeList= ashap)
+      s = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=0, knownHaps = kHaps, excludeList=[])
+
+      for tup in e.keys():
+        print(",".join(peeps), tup[0], tup[1], e[tup], s[tup], theta, str(state), sep="\t")
+
+    else:
+      s = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=0, knownHaps = kHaps, excludeList=[])
+      for tup in s.keys():
+        print(",".join(peeps), tup[0], tup[1], -1, s[tup], theta, str(state), sep="\t")
+
+        
 
 def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC=-1, nUnknown=1, knownHaps = [], excludeList=[]):
   """
@@ -858,9 +877,8 @@ def preprocessArgv(argv):
   return newargv
 
 
-if __name__ == "__main__":
 
-
+def peptide_main(argv):
   parser = argparse.ArgumentParser(description="Let's compute some likelihood ratios!\n")
 
 
@@ -873,6 +891,7 @@ if __name__ == "__main__":
 
   
   parser.add_argument('-V', '--cross_validate',         dest='V', help="Runs cross-validation; -V 1 runs leave-one out cross-validation, -V 2 is leave two-out, ...; combine with -S", type=int, default=0)
+  parser.add_argument('-X', '--cross_validate_nodenom', dest='X', help="Runs cross-validation without the denominator; -X 1 runs leave-one out cross-validation, -X 2 is leave two-out, ...; combine with -S", type=int, default=0)
   parser.add_argument('-1', '--all_single_source',      dest='SingleSource', help='compute all single source LRs; computes the likelihood for each person in one suffix array (-L, numerator) relative to the haplotypes generated from another (-S, denominator)', action="store_true")
   parser.add_argument('-N', '--all_nested_lrs',         dest='Nested', help='compute all nested LRs; -N 1 equivalent to -1 ; -N 2 computes all nested LRs that involve a 2-person mixture, -N 3 for 3-person...', default=0, type=int)
   
@@ -908,7 +927,7 @@ if __name__ == "__main__":
   parser.add_argument('-F', '--full_summaries',         dest='Full', help="Same as -Q, but it also prints who has which alleles (may be big!!)", action='store_true', default=False)
 
 
-  argv = preprocessArgv(sys.argv)
+  argv = preprocessArgv(argv)
 
   results = parser.parse_known_args(argv)[0]
   args = parser.parse_known_args(argv)[1]
@@ -918,12 +937,17 @@ if __name__ == "__main__":
   random.seed(results.S)
   if results.I < 1:
     IS_RANDOMIZED = False
-  
-  if results.Q is None or not os.path.isfile(results.Q):
-    print("There is no file: " , results.Q , file=sys.stderr, sep="\n")
-    parser.print_help()
-    sys.exit(1)
 
+  global SUFFIX_QUERY_RESULTS
+  global SUFFIX_QUERY
+  global SUFFIX_QUERY_ARRAY
+  SUFFIX_QUERY_ARRAY = SUFFIX_QUERY_RESULTS = SUFFIX_QUERY = None
+  
+    
+  # programatically, treat cross validation (no denom) as cross-validation with a negative number (-1 == loocv with w. no denom)
+  if results.X:
+    results.V = -results.X
+  
 
       # init the suffix array
   saObject = initSuffixArray(results.Binary, results.Array, results.Tmp, results.Cut)
@@ -951,7 +975,10 @@ if __name__ == "__main__":
     summarizePanel(peptidePanel, saObject, samps2pops, results.Full)
     exit(0)
 
-  
+  if results.Q is None or not os.path.isfile(results.Q):
+    print("There is no file: " , results.Q , file=sys.stderr, sep="\n")
+    parser.print_help()
+    sys.exit(1)  
     
   theta = results.T
   if results.N:
@@ -974,11 +1001,15 @@ if __name__ == "__main__":
     sys.exit(1)
     
 
-  if results.V > 0:
+  if results.V != 0:
 
     state =State("CV" + str(results.V), results.S)
+    computeDenom=True
+    if results.V < 0:
+      computeDenom=False
+      results.V = -results.V
     
-    e = crossValidate(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, results.V)
+    e = crossValidate(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, results.V, computeDenom)
   elif results.KNOWN:
     #results.KNOWN  are diploid ids (eg, SA001)
     # they need to be mapped into haploid ids (eg, SA001_1, SA001_2) (below)
@@ -1016,4 +1047,9 @@ if __name__ == "__main__":
     print("\n\nI don't know what to do!\n\n", file=sys.stderr)
     parser.print_help()
     sys.exit(1)
+
+    
+if __name__ == "__main__":
+  peptide_main(sys.argv)
+
     
