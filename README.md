@@ -22,10 +22,16 @@ The above formulation is assessed by considering alleles
 
 
 
-# Quick start
+# Quick start for *nix including [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about) (WSL)
+Setup:
 <br>
+```
 git clone --recursive https://github.com/Ahhgust/PeptideLR.git
+cd PeptideLR/protengine
+chmod +x Buildit_x64_linux.sh && ./Buildit_x64_linux.sh && ln -s $PWD/scripts_util/suffer.py ..
+```
 <br>
+
 
 ## Funding
 

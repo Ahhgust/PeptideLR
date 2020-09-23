@@ -37,8 +37,9 @@ import os.path
 import suffer
 import numpy
 import glob
-
-VERSION_NUM = "0.001"
+# 0.0011 -> added cache for peptide hits (keep last query)
+# 0.0012 -> added cache for peptide hits (keep all queries) AND added cache for keeping likelihoods (-N argument)
+VERSION_NUM = "0.0012"
 
 # A glorified named tuple
 # records the program state 
@@ -448,13 +449,29 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   global SUFFIX_QUERY_RESULTS
   global SUFFIX_QUERY
   global SUFFIX_QUERY_ARRAY
-  # optimization: I cache queries. just the last one.
+  global SUFFIX_CACHE
+  # optimization: I cache queries. (all of them)
   # this lets me keep the previous query, and recycle the search results.
-  if SUFFIX_QUERY is None or peptides != SUFFIX_QUERY or SUFFIX_QUERY_ARRAY != suffixarrayObject:
+  #  if SUFFIX_QUERY is None or peptides != SUFFIX_QUERY or SUFFIX_QUERY_ARRAY != suffixarrayObject:
+  # at most, the suffix cache be of size 2 (only 2 suffix arrays are supported, and all queries should involve the same peptides)
+  i=0
+  for tup in SUFFIX_CACHE:
+    if tup[0] == suffixarrayObject and tup[1] == peptides:
+      SUFFIX_QUERY_RESULTS=tup[2]
+      SUFFIX_QUERY=peptides
+      SUFFIX_QUERY_ARRAY=suffixarrayObject
+      break
+    i+=1
+
+  # cache miss. 
+  if i == len(SUFFIX_CACHE):
     SUFFIX_QUERY_RESULTS = suffixarrayObject.findOwners(peptides)
     SUFFIX_QUERY = peptides
     SUFFIX_QUERY_ARRAY = suffixarrayObject
+    SUFFIX_CACHE.append( (suffixarrayObject, peptides, SUFFIX_QUERY_RESULTS) )
 
+  # print(i, len(SUFFIX_CACHE), file=sys.stderr) # sanity check. yes, I'm recycling pointers so the equality check (address-based) is sufficient
+  
   # idx is a list of lists (integers).
   # whos is a list of strings (sample IDs)
   # the inner list's integers are indexes into whos
@@ -627,6 +644,9 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
   diploidIds = sorted(list(allHaps.keys()))
 
   print("NumeratorID", "DenominatorID", "NKnownDenom", "Dropin_Rate", "Dropout_Rate", "Denom", "Num", "Theta", state.keyHeader(), sep="\t")
+
+  # save on redundant computations; if we specify the same set of knowns and same number of unknowns, keep the likelihood
+  denomCache= {}
   
   for i in range(1, (numKnown+1)):
 
@@ -642,6 +662,8 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
       for person in peeps:
         kHaps.extend(allHaps[person])
 
+
+      
       # and compute the likelihood of the combination
       num = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=0, knownHaps = kHaps, excludeList=[])
       # and consider all proper subsets (ie, the powerset save the identitical set)
@@ -651,8 +673,15 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
         for person in subset:
           kHaps.extend(allHaps[person])
           
-        denom = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=totalSS-nKnown, knownHaps = kHaps, excludeList=[])
-
+        # key is: the known individuals , the # of unknowns
+        khapStr = ";".join(kHaps)
+        cacheKey = (khapStr, totalSS-nKnown)
+        if cacheKey not in denomCache:
+          denom = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=totalSS-nKnown, knownHaps = kHaps, excludeList=[])
+          denomCache[ cacheKey ] = denom
+        else:
+          denom = denomCache[ cacheKey ]
+          
         for tup in denom.keys():
           print(numID , ",".join(subset), len(subset), tup[0], tup[1], denom[tup], num[tup], theta, str(state), sep="\t")
         
@@ -941,8 +970,9 @@ def peptide_main(argv):
   global SUFFIX_QUERY_RESULTS
   global SUFFIX_QUERY
   global SUFFIX_QUERY_ARRAY
+  global SUFFIX_CACHE
   SUFFIX_QUERY_ARRAY = SUFFIX_QUERY_RESULTS = SUFFIX_QUERY = None
-  
+  SUFFIX_CACHE = []
     
   # programatically, treat cross validation (no denom) as cross-validation with a negative number (-1 == loocv with w. no denom)
   if results.X:
