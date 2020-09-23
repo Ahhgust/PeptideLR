@@ -1023,8 +1023,11 @@ def peptide_main(argv):
     print("Problems parsing the peptide-hits file: ", results.P, " at least one of the rows is... blank? irregular?", file=sys.stderr)
     parser.print_help()
     sys.exit(1)
+    
 
-
+  # forcibly take an intersection of the panel and the detects (let's the panel vary and the detects stay samsies)
+  peptidesDetected = [ p for p in peptidesDetected if p in peptidePanel]
+  
   if results.U < 0:
     print("The number of unknowns must be a non-negative integer! Not , ", results.U, file=sys.stderr)
     parser.print_help()
