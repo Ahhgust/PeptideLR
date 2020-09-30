@@ -1025,6 +1025,10 @@ def peptide_main(argv):
     sys.exit(1)
     
 
+  if len(peptidePanel) == 0:
+    print("Your panel is blank. Nothing to compute", file=sys.stderr)
+    sys.exit(0)
+    
   # forcibly take an intersection of the panel and the detects (let's the panel vary and the detects stay samsies)
   peptidesDetected = [ p for p in peptidesDetected if p in peptidePanel]
   

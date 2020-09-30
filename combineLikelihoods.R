@@ -18,8 +18,12 @@ if (length(argv)==0) {
 
 read1file <- function(f) {
     
-    tib <- readr::read_tsv(f, col_types=cols(), progress=FALSE)
-    tib$Filename <- f
+    tib <- readr::read_tsv(f, col_types=cols(), progress=FALSE, guess_max=10000)
+    if (nrow(tib)>0) {
+        tib$Filename <- f
+    } else {
+        add_column(tib, "Filename")
+    }
     return(tib)
 }
 
@@ -38,6 +42,11 @@ if (n_distinct(combined$experimentType) > 1) {
     stop("Multiple experiment-types are present...\nThat's not good!")
 }
 
+if (n_distinct(combined$versionNumber) > 1) {
+    write(unique(combined$experimentType), stderr())
+    stop("Multiple version numbers are present...\nThat's not good!")
+}
+
 allcols <- colnames(combined)
 # column names may vary; these remain the same.
 groups <- allcols[ allcols != "Denom" & allcols !="Num" & allcols != "Filename" & allcols != "Theta"]
@@ -45,8 +54,10 @@ groups <- allcols[ allcols != "Denom" & allcols !="Num" & allcols != "Filename" 
 group_by_at(combined, groups) %>%
     summarize(NumProduct=prod(Num),
               DenomProduct=prod(Denom),
-              LR=NumProduct/DenomProduct) %>%
-    ungroup() %>% arrange(desc(LR)) -> summ
+              LR=NumProduct/DenomProduct,
+              NCombined=n(),
+              ) %>%
+    ungroup() %>% arrange(desc(NumProduct)) -> summ
 
 cat( readr::format_tsv(summ) )
 
