@@ -47,15 +47,27 @@ class State(namedtuple("State", ["experimentType", "randomSeed"])):
   __slots__ = ()
 
   def __str__(self):
+
+    global LOGLIKES
+
+    likeStr="\tNone"
+    if LOGLIKES:
+      likeStr="\tLoglikelihood"
+      
     global IS_RANDOMIZED
     if not IS_RANDOMIZED:
-      return self.experimentType + "\t" + VERSION_NUM
-    return self.experimentType + "\t" + VERSION_NUM + "\t" + str(self.randomSeed)
+      return self.experimentType + "\t" + VERSION_NUM + likeStr
+    return self.experimentType + "\t" + VERSION_NUM + "\t" + str(self.randomSeed) + likeStr
+  
   def keyHeader(self):
+
+    likeStr="\tLikelihoodTransform"
+
+    
     global IS_RANDOMIZED
     if not IS_RANDOMIZED:
-      return "experimentType\tversionNumber"
-    return "experimentType\tversionNumber\trandomSeed"
+      return "experimentType\tversionNumber"+likeStr
+    return "experimentType\tversionNumber\trandomSeed"+likeStr
 
   
 # suffixes added to diploid IDs (e.g., NA12887)
@@ -370,7 +382,7 @@ def computeTheta(peptides, suffixarrayObject, pops2samps, ALT_MIN_THETA=1e-9, in
     
   return max(Bw, ALT_MIN_THETA)
 
-def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, weights=None ):
+def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, weights=None, logtrans=False ):
   """
   count up the number of dropin, contamination,
   and NOT dropin and NOT contamination "events" to explain the observed
@@ -408,13 +420,19 @@ def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, wei
       if total==0: # observed, but nobody has it!
         cont += 1  # must be contamination
 
-      if weights is not None:
-        contaminationWeight *= weights[i]
+      if weights is not None: # weights[i] == the probabiltity of allele i dropping in. Typically this is set to the allele frequency.
+        contaminationWeight *= weights[i] # when weights is none then the allele frequency is modeled as 1. This is the approach of Mitchell in their
+        # admittedly flawed FST program, though I would argue the most major flaw therein was how the system was implemented.
+
         
       else:
         notdrop += total
         notcont += 1
 
+  # equivalent to log of numpy.prod( ... )
+  if logtrans:
+    return( sum( [numpy.log(pow(C, cont)), numpy.log(pow(1-C, notcont)), numpy.log(pow(D, drop)), numpy.log(pow(1-D, notdrop)), numpy.log(contaminationWeight) ] ) )
+    
   return numpy.prod( [pow(C, cont), pow(1-C, notcont), pow(D, drop), pow(1-D, notdrop), contaminationWeight])
 
 def makeHotVector(peptidesInPanel, peptidesDetected):
@@ -881,13 +899,15 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   
   observed = makeHotVector(peptides, alleles)
 
+  global LOGLIKES
+  logTransform=LOGLIKES
 
   alleleWeights=None
   global WEIGHT_ALLELES
   global WEIGHTS
   if WEIGHT_ALLELES:
     alleleWeights=WEIGHTS
-  
+
   finalOutput = {}
   # handle the case of NO unknown haplotypes separately
   if nUnknown == 0:
@@ -896,10 +916,11 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
       # can decouple events from probability (more efficient)
       eventProb = haplotypeEventCalculator(observed,\
                                            [], knownHaps,\
-                                           d, c, alleleWeights)
+                                           d, c, alleleWeights, logTransform)
 
       finalOutput[(c,d)] = eventProb
-        
+
+      
     return finalOutput
 
   # from this point there is some number of unknown diploid individuals
@@ -942,13 +963,31 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
       # can decouple events from probability (more efficient)
       eventProb = haplotypeEventCalculator(observed,\
                                            haps, knownHaps,\
-                                           d, c, alleleWeights)
+                                           d, c, alleleWeights, logTransform)
 
-      if (c,d) not in finalOutput:
-        finalOutput[(c,d)] = knownProb * eventProb
+      # use the log-sum-exp trick to prevent underflow...
+      if logTransform:
+        if (c,d) not in finalOutput:
+          finalOutput[(c,d)] = []
+        
+        finalOutput[(c,d)].append( numpy.log( knownProb ) + eventProb )
+
+        
       else:
-        finalOutput[(c,d)] += knownProb * eventProb
+        if (c,d) not in finalOutput:
+          finalOutput[(c,d)] = knownProb * eventProb
+        else:
+          finalOutput[(c,d)] += knownProb * eventProb
 
+  # we don't keep the sum in this case, but an array of log likelihoods
+  # we want the sum of the likelihoods
+  # uses the log-sum-exp trick to get the log of this sum
+  # convert to a likelihood (optionally) with numpy.exp( finalOutput[k] )
+  if logTransform:
+    for k in finalOutput:
+      finalOutput[k] = numpy.logaddexp.reduce( finalOutput[k ] )
+
+  
   return finalOutput
 
 
@@ -994,6 +1033,7 @@ def peptide_main(argv):
   parser.add_argument('-X', '--cross_validate_nodenom', dest='X', help="Runs cross-validation without the denominator; -X 1 runs leave-one out cross-validation, -X 2 is leave two-out, ...; combine with -S", type=int, default=0)
   parser.add_argument('-1', '--all_single_source',      dest='SingleSource', help='compute all single source LRs; computes the likelihood for each person in one suffix array (-L, numerator) relative to the haplotypes generated from another (-S, denominator)', action="store_true")
   parser.add_argument('-W', '--weights',                dest='W', help='Weights contamination events by the allele frequency', action="store_true")
+  parser.add_argument('-l', '--loglikes',               dest='LL', help='Returns log likelihoods instead of raw likelihoods. Use when/if underflow occurs.', action="store_true")
   parser.add_argument('-N', '--all_nested_lrs',         dest='Nested', help='compute all nested LRs; -N 1 equivalent to -1 ; -N 2 computes all nested LRs that involve a 2-person mixture, -N 3 for 3-person...', default=0, type=int)
   
   # manually compute the likelihood function; specifying particular people... (fast, but you need to manually specify your hypotheses)
@@ -1051,7 +1091,11 @@ def peptide_main(argv):
   global WEIGHTS
   WEIGHTS=None
   
-    
+  global LOGLIKES
+  LOGLIKES=False
+  if results.LL:
+    LOGLIKES=True
+  
   # programatically, treat cross validation (no denom) as cross-validation with a negative number (-1 == loocv with w. no denom)
   if results.X:
     results.V = -results.X
