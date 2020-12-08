@@ -370,7 +370,7 @@ def computeTheta(peptides, suffixarrayObject, pops2samps, ALT_MIN_THETA=1e-9, in
     
   return max(Bw, ALT_MIN_THETA)
 
-def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C ):
+def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, weights=None ):
   """
   count up the number of dropin, contamination,
   and NOT dropin and NOT contamination "events" to explain the observed
@@ -384,6 +384,8 @@ def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C ):
 
   nAlleles = len(observed)
 
+  contaminationWeight=1
+  
   for i in range(nAlleles):
     total=0
     # in the pseudocode the two sets of haplotypes (known and unknown) are joined
@@ -405,11 +407,15 @@ def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C ):
     else:
       if total==0: # observed, but nobody has it!
         cont += 1  # must be contamination
+
+      if weights is not None:
+        contaminationWeight *= weights[i]
+        
       else:
         notdrop += total
         notcont += 1
 
-  return numpy.prod( [pow(C, cont), pow(1-C, notcont), pow(D, drop), pow(1-D, notdrop)])
+  return numpy.prod( [pow(C, cont), pow(1-C, notcont), pow(D, drop), pow(1-D, notdrop), contaminationWeight])
 
 def makeHotVector(peptidesInPanel, peptidesDetected):
   """
@@ -574,6 +580,63 @@ def readSingleColumnFile(f, column2grab=1, sep="\t", header=False, callback=None
 
   h.close()
   return(col)
+
+def readTwoColumnFile(f, column2grab=1, nextColumn2grab=2, sep="\t", header=False, callback=None, otherCallback=None):
+  """
+  Takes in a filename (string)
+  and a column to grab (1-based index)
+  and ANOTHER column to grab
+  and a separator
+  the first line can be skipped (header=TRUE)
+  and a callback function can be applied to each element
+  and returns the column vector referred to (str type)
+  None is the type contained in the vector element if the row index not referred to is not present.
+
+  Note that calling readSingleColumnFile twice would accomplish the same thing
+  EXCEPT
+  such an approach does not work with a stream.... this does.
+  """
+
+  if f is None or not os.path.exists(f):
+    print("Failed to find file: ", f , "", sep="\n", file=sys.stderr)
+    return [None]
+  
+  if f.endswith(".gz"):
+    h = gzip.open(f)
+  else:
+    h = open(f)
+
+  column2grab -= 1 # convert to 0-based indexing
+  nextColumn2grab -= 1
+  
+  col = []
+  otherCol = []
+  
+  for line in h:
+    if header: # optionally skip the 1st line...
+      header=False
+      continue
+    
+    row = line.rstrip().split(sep)
+    
+    if column2grab < len(row):
+      if callback is None:
+        col.append(row[column2grab])
+      else:
+        col.append( callback(row[column2grab]) )
+    else:
+      col.append(None)
+
+    if nextColumn2grab < len(row):
+      if otherCallback is None:
+        otherCol.append(row[nextColumn2grab])
+      else:
+        otherCol.append( otherCallback(row[nextColumn2grab]) )
+    else:
+      otherCol.append(None)
+
+  h.close()
+  return((col, otherCol))
 
 
 def initSuffixArray(binary, array, tmpdir, cutfile):
@@ -818,6 +881,13 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   
   observed = makeHotVector(peptides, alleles)
 
+
+  alleleWeights=None
+  global WEIGHT_ALLELES
+  global WEIGHTS
+  if WEIGHT_ALLELES:
+    alleleWeights=WEIGHTS
+  
   finalOutput = {}
   # handle the case of NO unknown haplotypes separately
   if nUnknown == 0:
@@ -826,7 +896,7 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
       # can decouple events from probability (more efficient)
       eventProb = haplotypeEventCalculator(observed,\
                                            [], knownHaps,\
-                                           d, c)
+                                           d, c, alleleWeights)
 
       finalOutput[(c,d)] = eventProb
         
@@ -846,6 +916,7 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   nHaps = len(hapVectors)
     
   intList = list(range(nHaps))
+
 
   for unkInts in unknownHaplotypeGenerator(nHaps, nUnknown, nMC, hapCumulative):
           
@@ -871,7 +942,7 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
       # can decouple events from probability (more efficient)
       eventProb = haplotypeEventCalculator(observed,\
                                            haps, knownHaps,\
-                                           d, c)
+                                           d, c, alleleWeights)
 
       if (c,d) not in finalOutput:
         finalOutput[(c,d)] = knownProb * eventProb
@@ -922,6 +993,7 @@ def peptide_main(argv):
   parser.add_argument('-V', '--cross_validate',         dest='V', help="Runs cross-validation; -V 1 runs leave-one out cross-validation, -V 2 is leave two-out, ...; combine with -S", type=int, default=0)
   parser.add_argument('-X', '--cross_validate_nodenom', dest='X', help="Runs cross-validation without the denominator; -X 1 runs leave-one out cross-validation, -X 2 is leave two-out, ...; combine with -S", type=int, default=0)
   parser.add_argument('-1', '--all_single_source',      dest='SingleSource', help='compute all single source LRs; computes the likelihood for each person in one suffix array (-L, numerator) relative to the haplotypes generated from another (-S, denominator)', action="store_true")
+  parser.add_argument('-W', '--weights',                dest='W', help='Weights contamination events by the allele frequency', action="store_true")
   parser.add_argument('-N', '--all_nested_lrs',         dest='Nested', help='compute all nested LRs; -N 1 equivalent to -1 ; -N 2 computes all nested LRs that involve a 2-person mixture, -N 3 for 3-person...', default=0, type=int)
   
   # manually compute the likelihood function; specifying particular people... (fast, but you need to manually specify your hypotheses)
@@ -973,6 +1045,12 @@ def peptide_main(argv):
   global SUFFIX_CACHE
   SUFFIX_QUERY_ARRAY = SUFFIX_QUERY_RESULTS = SUFFIX_QUERY = None
   SUFFIX_CACHE = []
+
+  global WEIGHT_ALLELES
+  WEIGHT_ALLELES=False
+  global WEIGHTS
+  WEIGHTS=None
+  
     
   # programatically, treat cross validation (no denom) as cross-validation with a negative number (-1 == loocv with w. no denom)
   if results.X:
@@ -985,13 +1063,38 @@ def peptide_main(argv):
     parser.print_help()
     sys.exit(1)
 
+  errors=0
   if results.Summaries or results.Full:
     peptidePanel = readSingleColumnFile(results.A, callback=None)
+  elif results.W:
+    (peptidePanel, weights) = readTwoColumnFile(results.A, callback=isoleucine2leucine)
+    if None in weights:
+      print("Problem parsing the weights from the peptide panel file. I need a two-column file of peptides; the first is the peptide, the second is the weight.", file=sys.stderr)
+      errors+=1
+    try:
+      weights = [ float(w) for w in weights ]
+    except ValueError:
+      print("At least one of the float values is not a number", file=sys.stderr)
+      errors += 1
+
+    # set up a global variable to house the weights
+    # everything is set up as a parallel array
+    # so just referring to the index is sufficient.
+    WEIGHT_ALLELES=True
+    WEIGHTS=weights
+
+    if min(weights) < 0 or max(weights)>1:
+      print("Proper weights must be frequencies between 0 and 1...", file=sys.stderr)
+      errors += 1
+      
   else:
     peptidePanel = readSingleColumnFile(results.A, callback=isoleucine2leucine)
     
   if None in peptidePanel:
     print("Problems parsing the peptide panel file: ", results.A, " at least one of the rows is... blank? irregular?", file=sys.stderr)
+    parser.print_help()
+    sys.exit(1)
+  elif errors:
     parser.print_help()
     sys.exit(1)
     
