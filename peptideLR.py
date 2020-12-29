@@ -69,6 +69,8 @@ class State(namedtuple("State", ["experimentType", "randomSeed"])):
       return "experimentType\tversionNumber"+likeStr
     return "experimentType\tversionNumber\trandomSeed"+likeStr
 
+
+
   
 # suffixes added to diploid IDs (e.g., NA12887)
 # to make them haploid (into NA12887_1)
@@ -466,6 +468,10 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   nSamps is the haploid sample size (which I need to get which people have the 0-vector haplotype)
   """
 
+  #TODO:
+  # USE THE INCLUDE() and the extended suffix array object!
+  #only incclude therelavant pops!
+  
   # first, figure out who has which peptide
   #note: if an individual has none of the peptides, they are NOT in ww
   ww = dict() # who has what. associates an individual with the peptides they have
@@ -494,7 +500,6 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
     SUFFIX_QUERY_ARRAY = suffixarrayObject
     SUFFIX_CACHE.append( (suffixarrayObject, peptides, SUFFIX_QUERY_RESULTS) )
 
-  # print(i, len(SUFFIX_CACHE), file=sys.stderr) # sanity check. yes, I'm recycling pointers so the equality check (address-based) is sufficient
   
   # idx is a list of lists (integers).
   # whos is a list of strings (sample IDs)
@@ -505,12 +510,25 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   whos = res[1]
   nPeps = len(peptides)
 
+  global USE_WHITELIST
+  global WHITELIST
+  global SAPOINTER
+  useWhitelist = USE_WHITELIST and SAPOINTER==suffixarrayObject
+  
   if len(include):
     nSamps = len(include)
-  
+
+  if useWhitelist:
+    nSamps = len(WHITELIST)
+
   for i in range(nPeps):
     for index in idx[i]:
       who = whos[index]
+
+      if useWhitelist:
+        if who not in WHITELIST:
+          continue 
+      
       if len(include) == 0 or who in include:
         if who not in ww:
           ww[who] = set()
@@ -556,7 +574,6 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
     s = "0" * len(peptides)
     hotDict[s] = leftovers
 
-    
   return(hotDict, nSamps)
 
 def readSingleColumnFile(f, column2grab=1, sep="\t", header=False, callback=None):
@@ -1040,6 +1057,8 @@ def peptide_main(argv):
   parser.add_argument('-K', '--known_individuals',      dest='KNOWN', help="Named known individuals under H1 (aka Hp).",type=str, default=[], nargs="+")
   parser.add_argument('-U', '--n_unknown',              dest='U', help="the number of (additional) unknown individuals", type=int, default=0)
 
+  parser.add_argument('-P', '--population',              dest='Pops', help="Restrict to the population (refers to -q)", type=str, default="")
+  
   
   ###
   ### Only for use when run with Monte Carlo sampling... (not recommended; no theta correction.)
@@ -1095,7 +1114,14 @@ def peptide_main(argv):
   LOGLIKES=False
   if results.LL:
     LOGLIKES=True
+
+  global USE_WHITELIST
+  global WHITELIST
+  global SAPOINTER
+  USE_WHITELIST=False
+  WHITELIST=SAPOINTER=None
   
+    
   # programatically, treat cross validation (no denom) as cross-validation with a negative number (-1 == loocv with w. no denom)
   if results.X:
     results.V = -results.X
@@ -1183,7 +1209,30 @@ def peptide_main(argv):
     print("The number of unknowns must be a non-negative integer! Not , ", results.U, file=sys.stderr)
     parser.print_help()
     sys.exit(1)
-    
+
+  if results.Pops != "":
+    if pops2samps is None:
+      (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
+      if pops2samps is None:
+        print("Cannot filter to population: " , results.Pops, " no populations have been defined", file=sys.stderr)
+        exit(1)
+      elif results.Pops not in pops2samps:
+        print("Cannot filter population: ", results.Pops, "It's not in the file: ", results.Q, pops2samps.keys(), sep="\n", file=sys.stderr)
+        exit(1)
+
+    # alll people in some population
+    wl= diploidIDsToHaploid( pops2samps[ results.Pops ] ) 
+    WHITELIST = set()
+    USE_WHITELIST=True
+    SAPOINTER=saObject
+    allpeeps = set(saObject.listAllPeople()) #all people in all populations
+    for w in wl:# intersect (don't ask me why you have to do this, but you do. All files are coming from 1KG project...)
+      if w in allpeeps:
+        WHITELIST.add(w)
+        
+    if len(WHITELIST)==0:
+      print("Should never happen. The intersection of the database and the population: ", results.Pops, " is empty...", file=sys.stderr)
+      exit(1)
 
   if results.V != 0:
 
