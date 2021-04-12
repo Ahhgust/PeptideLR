@@ -10,6 +10,19 @@ import gzip
 MIN_THETA=1e-6
 DEFAULT_PROTENGINE_DIR = 'ProtengineR3' # must be the RELATIVE path. by default, this needs to be in the src/ directory for the main script
 
+def runOrDie(command):
+  """
+  Homage to perl's die command
+  this exec's the command in the shell
+  AND it captures the return/exit code
+  and tests for 0 (clean exit)
+  """  
+  if os.system(command) != 0:
+    print("Some problem with command:" , command , file=sys.stderr, sep="\n")
+    exit(1)
+    
+  return True
+
 def getArrays(callingFrom):
   """
   This takes in sys.argv[0]
@@ -45,45 +58,41 @@ def getBinary(zprojDir):
   return None
 
 
-def makeCommands(profinman, pepLR, args, detects, outdir, nullArray=None, altArray=None):
+def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=None):
 
 
-  pepLRCommand = pepLR + " -B " + profinman + " -T " + os.path.join(outdir, args.N) 
-
-  # population info -> per population allele frequency
-  if nullArray is not None:
-    pepLRCommand += " -S " + nullArray 
-  else:
-    print("Should never be here\n", args, file=sys.stderr)
+  pepLRCommand = pepLR + " -B " + profinman + " -T " + os.path.join(outdir, args.N) + " -S " + nullArray 
 
   if os.path.isfile( os.path.join(nullArray, "samples2populations.tsv")  ):
     pepLRCommand += " -q " + os.path.join(nullArray, "samples2populations.tsv")
 
     
   # peptide query
-  outfile = os.path.join(outdir, "peptideQuery.tsv")
+  outfile = os.path.join(outdir, "peptideQuery." + args.N + ".tsv")
   detectsFile = os.path.join(outdir, "rawDetects.tsv")
-  queryResultsFile =  os.path.join(outdir, "queryResults.tsv")
-  
-  with open(detectsFile, "w") as fh:
-    for peps in detects.values():
-      for pep in peps:
-        print(pep, file=fh)
+  queryResultsFile =  os.path.join(outdir, "queryResults." + args.N + ".tsv")
+
+  if not os.path.isfile(detectsFile):
+    with open(detectsFile, "w") as fh:
+      for peps in detects.values():
+        for pep in peps:
+          print(pep, file=fh)
           
-  with open(outfile, "w") as fh:
-    command = pepLRCommand
-    if os.path.isfile( os.path.join(nullArray, "samples2populations.tsv")  ):
-      command += " -F"
-    else:
-      command += " -Q"
+  if not os.path.isfile(outfile):
+    with open(outfile, "w") as fh:
+      command = pepLRCommand
+      if os.path.isfile( os.path.join(nullArray, "samples2populations.tsv")  ):
+        command += " -F"
+      else:
+        command += " -Q"
       
-    command += " -a " + detectsFile + " > " + queryResultsFile
-    print(command, file=fh)
+      command += " -a " + detectsFile + " > " + queryResultsFile
+      print(command, file=fh)
 
   # this performs the suffix array search (once)
   # wrt to the null suffix array (1000 Genomes and the like)
   if not os.path.isfile(queryResultsFile):
-    os.system(command)
+    runOrDie(command)
 
   if not os.path.isfile(queryResultsFile):
     print("Cannot find file: " , queryResultsFile, "Must be some file permission issues...", file=sys.stderr)
@@ -94,9 +103,27 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray=None, altArr
     command = pepLRCommand + " -G -a " + detectsFile + " > " + genomicFile
     with open(outfile, "a") as fh:
       print(command, fh)
-    os.system(command)
-    
-    
+      
+    runOrDie(command)
+
+
+  # we query the suffix array once (regardless of the type)
+  # this serves to do the peptide lookup once
+  # and the downstream rmp/lr calculations can recycle the original query
+  if altArray is not None:
+    outfile = os.path.join(outdir, "peptideQuery." + args.A + ".tsv")
+    queryResultsFileAlt =  os.path.join(outdir, "queryResults." + args.A + ".tsv")
+    if not os.path.isfile(queryResultsFileAlt):
+      # Note that the TMP dir changes 
+      pepLRCommand = pepLR + " -Q -B " + profinman + " -T " + os.path.join(outdir, args.A) + " -S " + altArray 
+
+      with open(outfile, "w") as fh:
+        command = pepLRCommand
+        command += " -a " + detectsFile + " > " + queryResultsFileAlt
+        print(command, file=fh)
+      
+      runOrDie(command)
+      
   # invert the detects (was chrom -> peptides. make peptides -> chrom)
   pep2chrom = dict()
   # panel file handles
@@ -154,18 +181,20 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray=None, altArr
   for pop in handles:
     for chrom in handles[pop]:
       handles[pop][chrom].close()
-      
-  # make per-chromosome annotations
-  if args.R or args.L:
-    command = pepLRCommand + " -p " + detectsFile
 
-    if args.R:
-      outfileBase = os.path.join(outdir,  "RMP")
-      command += " -r 1000"
-    else:
-      outfileBase = os.path.join(outdir,  "LR")
-      command += " -1" # TODO: Second SA lookup, and modify peptideLR to take two temp directories
+  # -Y is for the numberator/population suffix array
+  pepLRCommand = pepLR + " -B " + profinman + " -Z " + os.path.join(outdir, args.N) + " -S " + nullArray 
+  # make per-chromosome annotations
+  if args.R:
+    
+    if not os.path.isdir( os.path.join(outdir, "RMPs")):
+      os.mkdir(os.path.join(outdir, "RMPs"))
       
+    command = pepLRCommand + " -p " + detectsFile
+    
+    outfileBase = os.path.join(outdir, "RMPs", "RMP")
+    command += " -r 1000"
+       
     for block in detects:
 
       for pop in args.P:
@@ -175,11 +204,28 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray=None, altArr
         if not os.path.isfile(outfile):
           print(command , append , panelFiles[(pop, block)] ,  ">", outfile, sep=' ')
 
+  # block-level (ie, chromosome level) RMPs/LRs get written to directories of that name  
+  if args.L:
 
-          
-          
-          
-        
+    if not os.path.isdir( os.path.join(outdir, "LRs")):
+      os.mkdir(os.path.join(outdir, "LRs"))
+    
+    command = pepLRCommand + " -p " + detectsFile + " -Y " + os.path.join(outdir, args.A) + " -L " + altArray
+    outfileBase = os.path.join(outdir, "LRs", "LR")
+
+    if args.L==1: # -1 implementation is faster. Let's use that if we can.
+      command += " -1"
+    else:
+      command += " -N " + str(args.L)
+      
+    for block in detects:
+      for pop in args.P:
+        outfile = outfileBase + "." + pop + "." + block
+        append = ""
+
+        if not os.path.isfile(outfile):
+          print(command , append , panelFiles[(pop, block)] ,  ">", outfile, sep=' ')
+
       
 def buildArgvParser(parser):
   """
@@ -190,13 +236,15 @@ def buildArgvParser(parser):
   parser.add_argument('-p', '--population', dest='P', help="Sets the reference population (P) in the likelihood estimation. Defaults to pooled frequencies (Total)", type=str, nargs="+", default=["Total"])
   parser.add_argument('-t', '--theta', dest='T', help="Turns on the theta-correction", default=MIN_THETA)
   parser.add_argument('-d', '--detects', dest='D', help="A file with the peptide detections...", default="-")
-  parser.add_argument('-P', '--detects_peptide_colname', dest="pepcol", help="In -D, the column name for the peptide detections", default='peptide_seq')
-  parser.add_argument('-C', '--detects_chromosome_colname', dest="chromcol", help="In -C, the column name for the chromosome (or any categorical variable used to partition the detections)", default='chromosome')
+  parser.add_argument('-P', '--detects_peptide_colname', dest="pepcol", help="In -D, the column name for the peptide detections", default='Peptide')
+  parser.add_argument('-C', '--detects_chromosome_colname', dest="chromcol", help="In -C, the column name for the chromosome (or any categorical variable used to partition the detections)", default='Chromosome')
 
   parser.add_argument('-q', '--query_allele_frequencies', dest='Q', help="Computes allele frequencies on --detects", action='store_true')
   parser.add_argument('-g', '--genomic', dest='G', help="Generates genomic information on peptides", action='store_true')
   parser.add_argument('-n', '--null_array', dest='N', help="The null/reference array. Default: HG38_Clean", default="HG38_Clean")
+  parser.add_argument('-a', '--alt_array', dest='A', help="The comparison array", default="")
   parser.add_argument('-o', '--output_directory', dest='O', help="The directory where the analysis is conducted", default='')
+  parser.add_argument('-c', '--n_cpus', dest='C', help='The number of CPUs (degree of multi-processing) used. Only applies to RMP/LR calculation', default=1)
   parser.add_argument('-L', '--ls', dest='ls', help="Lists the suffix arrays in the default directory", action='store_true')
   parser.add_argument('-W', '--which_pops', dest='WhichPops', help="Lists the populations available in the suffix array", action='store_true')
   
@@ -247,7 +295,12 @@ def parser_main(argv):
   if outdir == '':
     if results.D=='-':
       outdir='out'
-  
+
+  if results.D != "-" and not os.path.isfile(results.D):
+    print("File: " , results.D , " cannot be found. Maybe there's a typo in the name?", file=sys.stderr)
+    exit(1)
+    
+      
   if results.D == '-':
     fh = sys.stdin
   elif results.D.endswith(".gz"):
@@ -261,8 +314,21 @@ def parser_main(argv):
     outdir = os.path.splitext(os.path.basename(results.D))[0]
 
   if results.N not in suffixArraysAndMore:
-    print("Cannot find the suffix array: results.N. Run\n", argv[0] , " --ls \nto list all suffix arrays", file=sys.stderr)
+    print("Cannot find the null/reference suffix array: ", results.N, " Run\n", argv[0] , " --ls \nto list all suffix arrays", file=sys.stderr)
     exit(1)
+
+  altArray = None
+  if results.A != "":
+    if results.A not in suffixArraysAndMore:
+      print("Cannot find the alt suffix array: ", results.A , " Run\n", argv[0] , " --ls \nto list all suffix arrays", file=sys.stderr)
+      exit(1)
+    altArray = suffixArraysAndMore[ results.A ]
+
+
+  if results.L > 0 and altArray is None:
+    print("Cannot be: You asked to compute a LR but you did not specify an alternative (alt) suffix array!", file=sys.stderr)
+    exit(1)
+    
     
   refArray = suffixArraysAndMore[ results.N ]
   if results.WhichPops:
@@ -313,7 +379,7 @@ def parser_main(argv):
   if fh != sys.stdin:
     fh.close()
 
-  makeCommands(profinman, lr, results, detects, outdir, refArray)
+  makeCommands(profinman, lr, results, detects, outdir, refArray, altArray)
 
 if __name__ == "__main__":
   parser_main(sys.argv)

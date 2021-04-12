@@ -41,7 +41,9 @@ import glob
 # 0.0012 -> added cache for peptide hits (keep all queries) AND added cache for keeping likelihoods (-N argument)
 # 0.0013 -> added weights (-W) and population filtering
 # 0.0014 -> added RMP
-VERSION_NUM = "0.0014"
+# 0.0015 -> modified to accommodate new suffix array (suffer.py) interface.
+# 0.0016 -> decoupled likelihoods in the LR presentation 
+VERSION_NUM = "0.0016"
 
 # A glorified named tuple
 # records the program state 
@@ -459,7 +461,6 @@ def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, wei
 
   contaminationWeight=1
 
-  
   for i in range(nAlleles):
     total=0
     # in the pseudocode the two sets of haplotypes (known and unknown) are joined
@@ -481,7 +482,7 @@ def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, wei
     else:
       if total==0: # observed, but nobody has it!
         cont += 1  # must be contamination
-
+        
         if weights is not None: # weights[i] == the probabiltity of allele i dropping in. Typically this is set to the allele frequency.
           contaminationWeight *= weights[i] # when weights is none then the allele frequency is modeled as 1. This is the approach of Mitchell in their
           # admittedly flawed FST program, though I would argue the most major flaw therein was how the system was implemented.
@@ -528,7 +529,11 @@ def findOwners(suffixArrayObject, peptides):
     print("Peptides type error!", type(peptides), file=sys.stderr)
     exit(1)
 
-  search = suffer.ProteosPeptideSearch(suffixArrayObject, peptides, suffixArrayObject.tmpdir)
+  if suffixArrayObject.detectsList is not None:
+    search = suffer.ProteosPeptideSearch(suffixArrayObject, suffixArrayObject.detectsList, suffixArrayObject.tmpdir)
+  else:
+    search = suffer.ProteosPeptideSearch(suffixArrayObject, peptides, suffixArrayObject.tmpdir)
+    
   whos = suffixArrayObject.listAllPeople()
 
   i=0
@@ -544,9 +549,12 @@ def findOwners(suffixArrayObject, peptides):
   curMat = search.getNextMatch()
   i=0
   while curMat is not None:
+    
     curPep = curMat.sequence
+  
     # optimization: query is run once 
     if curPep not in peptides:
+      curMat = search.getNextMatch()
       continue
     
     curOwn = curMat.getFullPeptideOwnership()
@@ -558,7 +566,7 @@ def findOwners(suffixArrayObject, peptides):
 
     curMat = search.getNextMatch()
     
-  return out
+  return (out, whos)
 
 def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   """
@@ -607,9 +615,9 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   # the inner list's integers are indexes into whos
 #  res = suffixarrayObject.findOwners(peptides)
   res = SUFFIX_QUERY_RESULTS
-  #idx = res[0]
-  #whos = res[1]
-  idx = res
+  idx = res[0]
+  whos = res[1]
+  
   nPeps = len(peptides)
 
   global USE_WHITELIST
@@ -624,8 +632,8 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
     nSamps = len(WHITELIST)
 
   for i in range(nPeps):
-    for who in idx[i]:
-      #who = whos[index]
+    for index in idx[i]:
+      who = whos[index]
 
       if useWhitelist:
         if who not in WHITELIST:
@@ -635,7 +643,7 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
         if who not in ww:
           ww[who] = set()
           
-        ww[who].add(peptides[i]) # haploid identifier (who)-> set of peptides associated with that person
+        ww[who].add(peptides[i]) # haploid identifier (who)-> set of peptides associated with that (haploid) person
     
   
   if len(exclude):
@@ -794,7 +802,9 @@ def initSuffixArray(binary, array, tmpdir):
   """
   
   sa = suffer.ProteosSuffixWrapper(binary, array)
-  sa.tmpdir=tmpdir # kludge. Keep the directory as a cache 
+  sa.tmpdir=tmpdir # kludge. Keep the directory as a cache
+  sa.detectsList=None # When we cache hits (using suffer.py) the search needs to remain the same
+  # the initial search is often genomic; this lets me dynamically subset
   return sa
 
 def computeLRWithKnowns(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, state, saKnown, knownIDs, nUnknown):
@@ -813,7 +823,6 @@ def computeLRWithKnowns(saObject, alleles, peptides, theta, dropoutRate, dropinR
   the list of known individuals (knownIDs, haploid IDs; consecutive pairs -> 1 diploid individual
   (and saKnown, which is the corresponding suffix array)
   and the number of unknown individuals (0+), counting diploid individuals
-
   """
 
 
@@ -852,7 +861,7 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
   allHaps = getAllDiplotypes(saKnown, peptides)
   diploidIds = sorted(list(allHaps.keys()))
 
-  print("NumeratorID", "DenominatorID", "NKnownDenom", "Dropin_Rate", "Dropout_Rate", "Denom", "Num", "Theta", state.keyHeader(), sep="\t")
+  print("ID", "NKnown", "NTotal", "Dropin_Rate", "Dropout_Rate", "Likelihood", "Theta", state.keyHeader(), sep="\t")
 
   # save on redundant computations; if we specify the same set of knowns and same number of unknowns, keep the likelihood
   denomCache= {}
@@ -871,13 +880,17 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
       for person in peeps:
         kHaps.extend(allHaps[person])
 
-
-      
       # and compute the likelihood of the combination
       num = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=0, knownHaps = kHaps, excludeList=[])
+      for tup in num.keys():
+        print(numID , i, i, tup[0], tup[1], num[tup], theta, str(state), sep="\t")
+          
       # and consider all proper subsets (ie, the powerset save the identitical set)
       for subset in chain.from_iterable(combinations(peeps,n) for n in range(totalSS)):
         nKnown=len(subset)
+        subsetID = ",".join(subset)
+        if nKnown==0:
+          subsetID = "Random"
         kHaps = []
         for person in subset:
           kHaps.extend(allHaps[person])
@@ -888,11 +901,12 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
         if cacheKey not in denomCache:
           denom = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=totalSS-nKnown, knownHaps = kHaps, excludeList=[])
           denomCache[ cacheKey ] = denom
-        else:
-          denom = denomCache[ cacheKey ]
-          
+        else: # redundant computation. skip it.
+          continue
+
+          #print("DenominatorID", "NKnownDenom", "Dropin_Rate", "Dropout_Rate", "Denom", "Num", "Theta", state.keyHeader(), sep="\t")
         for tup in denom.keys():
-          print(numID , ",".join(subset), len(subset), tup[0], tup[1], denom[tup], num[tup], theta, str(state), sep="\t")
+          print(subsetID, len(subset), i, tup[0], tup[1], denom[tup], theta, str(state), sep="\t")
         
       
 def allSingleSourceLR(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, state, saKnown):
@@ -904,12 +918,14 @@ def allSingleSourceLR(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   """
   
   denom=computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=1, knownHaps = [], excludeList= [])
-
+  for tup in denom.keys():
+    print("RandomPerson", tup[0], tup[1], denom[tup], theta, str(state), sep="\t")
+    
   peeps = saKnown.listAllPeople() # these are haploid, but I can't guarantee the order
   diploidIds = sorted(list(set( [f[:-2] for f in peeps] ))) # now diploid 
   hapIds = diploidIDsToHaploid(diploidIds) # and ordered, haploid
 
-  print("ID", "Dropin_Rate", "Dropout_Rate", "Denom", "Num", "Theta", state.keyHeader(), sep="\t")
+  print("ID", "Dropin_Rate", "Dropout_Rate", "Likelihood", "Theta", state.keyHeader(), sep="\t")
   
   for i in range(0, len(hapIds), 2):
     (haplotypes1, nSampK) = peptides2hot(peptides, saKnown, 2, include= hapIds[i:(i+2)])
@@ -925,7 +941,7 @@ def allSingleSourceLR(saObject, alleles, peptides, theta, dropoutRate, dropinRat
 
     numer=computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=0, knownHaps = knownHaps, excludeList= [])
     for tup in denom.keys():
-      print(hapIds[i][:-2], tup[0], tup[1], denom[tup], numer[tup], theta, str(state), sep="\t")
+      print(hapIds[i][:-2], tup[0], tup[1], numer[tup], theta, str(state), sep="\t")
 
 def getAllDiplotypes(saObject, peptides):
   """
@@ -1004,10 +1020,20 @@ def crossValidate(saObject, alleles, peptides, theta, dropoutRate, dropinRate, n
 
 
 def computeRMP(saObject, peptides, theta, numIts, dropin, state, altMinCount=5.0):
-
+  """
+  This is an adaptation of the RMP of Woerner et al. 2020 https://doi.org/10.1016/j.fsigen.2020.102295
+  It takes in a suffix array object, and list of peptides detected
+  A theta correction value 
+  And it further needs a vector/list of dropin rates and the program state,
+  as well as an alternative minimum allele count (wherein all counts < this are set to this)
+  RMPs are used to express the rarity of some set of peptides detected under the assumption
+  that the data are single source, with the variety provided permitting some global dropin (false +)
+  rate.
+  """
+  
   peeps = saObject.listAllPeople()
   (haplotypes, nSamp) = peptides2hot(peptides, saObject, len(peeps) )
-
+  
   nPeps = len(peptides)
 
   hItems = [ (h[0], h[1]) for h in haplotypes.items() ]
@@ -1131,7 +1157,6 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   # handle the case of NO unknown haplotypes separately
   if nUnknown == 0:
     for c,d in product(dropinRate, dropoutRate):
-      
       # can decouple events from probability (more efficient)
       eventProb = haplotypeEventCalculator(observed,\
                                            [], knownHaps,\
@@ -1178,7 +1203,7 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
 
     # all combinations (cartesian product) of drop-in and dropout rates
     for c,d in product(dropinRate, dropoutRate):
-      
+
       # can decouple events from probability (more efficient)
       eventProb = haplotypeEventCalculator(observed,\
                                            haps, knownHaps,\
@@ -1206,7 +1231,6 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
     for k in finalOutput:
       finalOutput[k] = numpy.logaddexp.reduce( finalOutput[k ] )
 
-  
   return finalOutput
 
 
@@ -1283,7 +1307,9 @@ def peptide_main(argv):
 
   ## uncommon parameters
   ## for the suffix array
-  parser.add_argument('-T', '--tempDir',                dest='Tmp', help="temporary directory for suffix array lookup", type=str, default='TMP')
+  parser.add_argument('-T', '--tempDir',                dest='Tmp', help="temporary directory for suffix array lookup (pooled)", type=str, default='TMP')
+  parser.add_argument('-Y', '--tempNum',                dest='Tmp_N', help="temporary directory for suffix array lookup (numerator, results cached)", type=str, default='TMP_N')
+  parser.add_argument('-Z', '--tempDenom',                dest='Tmp_D', help="temporary directory for suffix array lookup (denominator, results cached)", type=str, default='TMP_D')
   parser.add_argument('-B', '--suffix_array_binary',    dest='Binary', help="the binary (executable) suffix array (include the path)", type=str, default="/home/becrloon/ProtengineR3/zproj_profinman/builds/bin_x64_linux/profinman") #default='/home/becrloon/ProtengineR2/Proteos/proteos/workflows/suffix_array/builds/bin_x64_linux')
 #  parser.add_argument('-C', '--cut_file',               dest='Cut', help="suffix array: how cuts (e.g., trypsin digest) are defined", type=str, default="/home/becrloon/ProtengineR2/Digests/trypsin_only.dig")
 
@@ -1333,8 +1359,12 @@ def peptide_main(argv):
     results.V = -results.X
   
 
+  tmpdir = results.Tmp
+  if results.Tmp_D != "TMP_D": # default
+    tmpdir = results.Tmp_D
+    
       # init the suffix array
-  saObject = initSuffixArray(results.Binary, results.Array, results.Tmp)
+  saObject = initSuffixArray(results.Binary, results.Array, tmpdir)
   if saObject is None:
     parser.print_help()
     sys.exit(1)
@@ -1398,6 +1428,8 @@ def peptide_main(argv):
     
 
   peptidesDetected = set( readSingleColumnFile(results.P, callback=isoleucine2leucine) )
+  saObject.detectsList= list( sorted( peptidesDetected))
+  
   if None in peptidesDetected:
     print("Problems parsing the peptide-hits file: ", results.P, " at least one of the rows is... blank? irregular?", file=sys.stderr)
     parser.print_help()
@@ -1407,7 +1439,13 @@ def peptide_main(argv):
   if results.R < 1: # but only if it's an LR. If it's an RMP there's no panel 
     peptidesDetected = set([ p for p in peptidesDetected if p in peptidePanel] )
   else: #case of RMP. we need the detects to be ordered and indexable
-    peptidesDetected = list( peptidesDetected )
+
+    if len(peptidePanel):
+      peptidesDetected = list([ p for p in peptidesDetected if p in peptidePanel])
+    else:
+      peptidesDetected = list( sorted(peptidesDetected ))
+
+    
 
   theta = results.T
   if results.N or results.Q == "":
@@ -1473,7 +1511,9 @@ def peptide_main(argv):
     # they need to be mapped into haploid ids (eg, SA001_1, SA001_2) (below)
     known = []
     
-    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray)
+    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray, results.Tmp_N)
+    saObjectKnown.detectsList = saObject.detectsList
+    
     allKnowns = saObjectKnown.listAllPeople()
     nFound = 0
     for k in results.KNOWN:
@@ -1494,11 +1534,15 @@ def peptide_main(argv):
     state =State("LR_Known_" + ";".join(results.KNOWN) + ":" + str(results.U) + "_unknown", results.Pops, results.S)
     e = computeLRWithKnowns(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown, known, results.U)
   elif results.SingleSource:
-    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray)
+    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray, results.Tmp_N)
+    saObjectKnown.detectsList = saObject.detectsList # needed for v2 of suffer.py. (caching)
+    
     state =State("LR_Known_AllSingleSource", results.Pops, results.S)
     e = allSingleSourceLR(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown)  
   elif results.Nested:
-    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray)
+    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray, results.Tmp_N)
+    saObjectKnown.detectsList = saObject.detectsList
+    
     state =State("LR_Nested_" + str(results.Nested), results.Pops, results.S)
     e = allNestedLRs(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown, results.Nested)
   else:
