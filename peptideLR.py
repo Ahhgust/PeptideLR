@@ -39,11 +39,13 @@ import numpy
 import glob
 # 0.0011 -> added cache for peptide hits (keep last query)
 # 0.0012 -> added cache for peptide hits (keep all queries) AND added cache for keeping likelihoods (-N argument)
-VERSION_NUM = "0.0012"
+# 0.0013 -> added weights (-W) and population filtering
+# 0.0014 -> added RMP
+VERSION_NUM = "0.0014"
 
 # A glorified named tuple
 # records the program state 
-class State(namedtuple("State", ["experimentType", "randomSeed"])):
+class State(namedtuple("State", ["experimentType", "Population", "randomSeed"])):
   __slots__ = ()
 
   def __str__(self):
@@ -53,11 +55,14 @@ class State(namedtuple("State", ["experimentType", "randomSeed"])):
     likeStr="\tNone"
     if LOGLIKES:
       likeStr="\tLoglikelihood"
+    pop = self.Population
+    if pop == "":
+      pop= "Pooled"
       
     global IS_RANDOMIZED
     if not IS_RANDOMIZED:
-      return self.experimentType + "\t" + VERSION_NUM + likeStr
-    return self.experimentType + "\t" + VERSION_NUM + "\t" + str(self.randomSeed) + likeStr
+      return self.experimentType + "\t" + pop + "\t" + VERSION_NUM + likeStr
+    return self.experimentType + "\t" + pop + "\t" + VERSION_NUM + "\t" + str(self.randomSeed) + likeStr
   
   def keyHeader(self):
 
@@ -66,8 +71,8 @@ class State(namedtuple("State", ["experimentType", "randomSeed"])):
     
     global IS_RANDOMIZED
     if not IS_RANDOMIZED:
-      return "experimentType\tversionNumber"+likeStr
-    return "experimentType\tversionNumber\trandomSeed"+likeStr
+      return "experimentType\tPopulation\tversionNumber"+likeStr
+    return "experimentType\tPopulation\tversionNumber\trandomSeed"+likeStr
 
 
 
@@ -217,69 +222,123 @@ def heterozygousProbWithTheta(theta, pu, pv):
   return (2*numerator1*numerator2)/denom
 
 
+def proteoGenomicLookup(peptides, suffixarrayObject, samps2pops):
+
+  peptides = list(sorted(peptides))
+  noI= [ isoleucine2leucine(s) for s in peptides ]
+  whos = suffixarrayObject.listAllPeople()
+  
+  search = suffer.ProteosPeptideSearch(suffixarrayObject, noI, suffixarrayObject.tmpdir)
+  curMat = search.getNextMatch()
+
+  print("Peptide", "Peptide20AA", "EnsemblID", "Chromosome", "Start", "Stop", "Strand", sep="\t")
+  # walk through the peptide detections (once)
+  # report the pooled allele frequency
+  i=0
+  while curMat is not None:
+    curPep = curMat.sequence
+    pepSought = peptides[i] # may be in 20AA alphabet
+    i += 1
+
+    prots = curMat.protData
+    d = set()
+    for prot in prots:
+
+      if len(prot) < 7:
+        continue
+      
+      protID = prot[1]
+      chrom = prot[3]
+      strand = prot[6]
+
+      # lower and upper genomic coordinates
+      lb = int(prot[4])
+      ub = int(prot[5])
+      if lb > ub:
+        (lb, ub) = (ub, lb)
+      
+      if protID not in d:
+        j = 7
+        while j + 4 < len(prot):
+          a = int(prot[j+1])
+          b = int(prot[j+2])
+          if a < lb:
+            lb = a
+          elif a > ub:
+            ub = a
+            
+          if b < lb:
+            lb = b
+          elif b > ub:
+            ub = b
+          j += 4
+
+        d.add(protID)
+        print(curPep, pepSought, protID, chrom, lb, ub, strand, sep="\t")
+
+    
+    
+    curMat = search.getNextMatch()
+    
 def summarizePanel(peptides, suffixarrayObject, samps2pops, verbose=False):
   """
   Computes some quick allele summary information on a panel...
   Note: Peptides have ISOLEUCINES
   """
 
-
-  allInds = set([s[:-2] for s in suffixarrayObject.listAllPeople() ])
-
+  peptides = list(sorted(peptides))
+  
   noI= [ isoleucine2leucine(s) for s in peptides ]
-  
-  res = suffixarrayObject.findOwners(noI)
-  idx = res[0]
-  whos = res[1]
-  nPeps=len(peptides)
 
-  pops = set()
-  
-  totsPops=defaultdict(int)
+  search = suffer.ProteosPeptideSearch(suffixarrayObject, noI, suffixarrayObject.tmpdir)
+  whos = suffixarrayObject.listAllPeople()
 
-  pops.add('Tot')
+  popTots = {} # pop -> total sample size of population
+  pepCounts = {} # peptide -> popuation -> count 
+  if verbose and samps2pops is not None:
+    # who is a haploid ID (ID + _MATERNAL_SUFFIX)
+    for who in whos:
+      dipID = who[:-2]
+      if dipID in samps2pops:
+        pop = samps2pops[dipID]
+        if pop not in popTots:
+          popTots[pop] = 1
+        else:
+          popTots[pop] += 1
   
-  for peep in allInds:
-    if peep in samps2pops:
-      totsPops[ samps2pops[peep] ] += 2
-      pops.add(samps2pops[peep] )
+  curMat = search.getNextMatch()
+  print("Population", "Peptide", "Peptide20AA", "AlleleCount", "AlleleFrequency", "Total", sep="\t")
+
+  popsOrdered = sorted(popTots.keys()) # fix the population ordering...
+  
+  # walk through the peptide detections (once)
+  # report the pooled allele frequency
+  i=0
+  while curMat is not None:
+    curPep = curMat.sequence
+    pepSought = peptides[i] # may be in 20AA alphabet
+    i += 1
+    curOwn = curMat.getFullPeptideOwnership()
+    print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), sep="\t")
+
+    if verbose and samps2pops is not None:
+      # initialize all population counts to 0
+      pepCounts[pepSought]={}
+      for pop in popsOrdered:
+        pepCounts[pop]=0
       
-  totsPops['Tot'] = len(allInds)*2
-  
-  pops = sorted(list(pops))
-  print("Peptide", end="")
-  for p in pops:
-    print("\t",p, "\t", p, "_tot", sep="",end="")
-  if verbose:
-    print("\twhos")
-  else:
-    print("")
-  
-  for i in range(nPeps):
-    d = defaultdict(int)
-
-    whoHasit = []
-    for index in idx[i]:
-      who = whos[index]  
-      if verbose:
-        whoHasit.append(who)
-      pep = peptides[i]
-      whoDip = who[:-2] # trim off the _1/_2 label
-
-      if whoDip in samps2pops:
-        d[ samps2pops[whoDip] ] += 1
-
-      d['Tot'] += 1
+      for own in curOwn:
+        dipID = own[:-2]
+        if dipID in samps2pops:
+          pop = samps2pops[dipID]
+          pepCounts[pop] += 1
+          
+      for pop in popsOrdered:
+        print(pop, curPep, pepSought, pepCounts[pop], popTots[pop], (pepCounts[pop]+0.5)/(popTots[pop]+1) ,sep="\t")
         
-    print(peptides[i],end="")
-    for p in pops:
-      print("\t" , d[p] , "\t", totsPops[p], sep="", end="")
-
-    if verbose:
-      print("\t", ";".join(sorted(whoHasit)), sep="")
-    else:
-      print("")
-
+    curMat = search.getNextMatch()
+    
+  
 def computeTheta(peptides, suffixarrayObject, pops2samps, ALT_MIN_THETA=1e-9, infiniteDB=True):
   """
   This is a custom theta computation
@@ -399,6 +458,7 @@ def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, wei
   nAlleles = len(observed)
 
   contaminationWeight=1
+
   
   for i in range(nAlleles):
     total=0
@@ -422,10 +482,9 @@ def haplotypeEventCalculator(observed, comparisonTo, comparisonToAlso, D, C, wei
       if total==0: # observed, but nobody has it!
         cont += 1  # must be contamination
 
-      if weights is not None: # weights[i] == the probabiltity of allele i dropping in. Typically this is set to the allele frequency.
-        contaminationWeight *= weights[i] # when weights is none then the allele frequency is modeled as 1. This is the approach of Mitchell in their
-        # admittedly flawed FST program, though I would argue the most major flaw therein was how the system was implemented.
-
+        if weights is not None: # weights[i] == the probabiltity of allele i dropping in. Typically this is set to the allele frequency.
+          contaminationWeight *= weights[i] # when weights is none then the allele frequency is modeled as 1. This is the approach of Mitchell in their
+          # admittedly flawed FST program, though I would argue the most major flaw therein was how the system was implemented.
         
       else:
         notdrop += total
@@ -455,6 +514,52 @@ def makeHotVector(peptidesInPanel, peptidesDetected):
   return "".join(det)
   
 
+def findOwners(suffixArrayObject, peptides):
+  """
+  Newest iteration of suffer retooled how peptide search works
+  and it changed the interface
+  This is a retrofit (old interface output from new interface)
+  returns a list of lists, parallel to peptides
+  each inner list is a list of ints; ints are indexes in whos (list of haploid identifiers)
+  s.t. that individual has that peptide
+  """
+
+  if not type(peptides) is list:
+    print("Peptides type error!", type(peptides), file=sys.stderr)
+    exit(1)
+
+  search = suffer.ProteosPeptideSearch(suffixArrayObject, peptides, suffixArrayObject.tmpdir)
+  whos = suffixArrayObject.listAllPeople()
+
+  i=0
+  w2i = {}
+  for who in whos:
+    w2i[who]=i
+    i += 1
+
+  out = []
+  for p in peptides:
+    out.append([])
+
+  curMat = search.getNextMatch()
+  i=0
+  while curMat is not None:
+    curPep = curMat.sequence
+    # optimization: query is run once 
+    if curPep not in peptides:
+      continue
+    
+    curOwn = curMat.getFullPeptideOwnership()
+    inner = out[i]
+    i += 1
+    for who in curOwn:
+      if who in w2i:
+        inner.append( w2i[who] )
+
+    curMat = search.getNextMatch()
+    
+  return out
+
 def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   """
   This takes in a set of peptides (vector of strings)
@@ -468,10 +573,6 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   nSamps is the haploid sample size (which I need to get which people have the 0-vector haplotype)
   """
 
-  #TODO:
-  # USE THE INCLUDE() and the extended suffix array object!
-  #only incclude therelavant pops!
-  
   # first, figure out who has which peptide
   #note: if an individual has none of the peptides, they are NOT in ww
   ww = dict() # who has what. associates an individual with the peptides they have
@@ -495,7 +596,7 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
 
   # cache miss. 
   if i == len(SUFFIX_CACHE):
-    SUFFIX_QUERY_RESULTS = suffixarrayObject.findOwners(peptides)
+    SUFFIX_QUERY_RESULTS = findOwners(suffixarrayObject,peptides) # TODO: revamp. redirect to give an equivalent encoding.
     SUFFIX_QUERY = peptides
     SUFFIX_QUERY_ARRAY = suffixarrayObject
     SUFFIX_CACHE.append( (suffixarrayObject, peptides, SUFFIX_QUERY_RESULTS) )
@@ -506,8 +607,9 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   # the inner list's integers are indexes into whos
 #  res = suffixarrayObject.findOwners(peptides)
   res = SUFFIX_QUERY_RESULTS
-  idx = res[0]
-  whos = res[1]
+  #idx = res[0]
+  #whos = res[1]
+  idx = res
   nPeps = len(peptides)
 
   global USE_WHITELIST
@@ -522,8 +624,8 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
     nSamps = len(WHITELIST)
 
   for i in range(nPeps):
-    for index in idx[i]:
-      who = whos[index]
+    for who in idx[i]:
+      #who = whos[index]
 
       if useWhitelist:
         if who not in WHITELIST:
@@ -674,10 +776,10 @@ def readTwoColumnFile(f, column2grab=1, nextColumn2grab=2, sep="\t", header=Fals
   return((col, otherCol))
 
 
-def initSuffixArray(binary, array, tmpdir, cutfile):
+def initSuffixArrayOld(binary, array, tmpdir, cutfile):
   """
   Initializes the suffix array object...
-  
+  (this is for the V2 implementation of profinman. now retired.
   """
   names = glob.glob(array + "/*names")
   if len(names)==0:
@@ -685,6 +787,15 @@ def initSuffixArray(binary, array, tmpdir, cutfile):
     return None
   
   return suffer.SuffixArraySearch(binary, array, names[0], tmpdir, cutfile)
+
+def initSuffixArray(binary, array, tmpdir):
+  """
+  Initializes the suffix array object...
+  """
+  
+  sa = suffer.ProteosSuffixWrapper(binary, array)
+  sa.tmpdir=tmpdir # kludge. Keep the directory as a cache 
+  return sa
 
 def computeLRWithKnowns(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, state, saKnown, knownIDs, nUnknown):
   """
@@ -890,8 +1001,99 @@ def crossValidate(saObject, alleles, peptides, theta, dropoutRate, dropinRate, n
       for tup in s.keys():
         print(",".join(peeps), tup[0], tup[1], -1, s[tup], theta, str(state), sep="\t")
 
-        
 
+
+def computeRMP(saObject, peptides, theta, numIts, dropin, state, altMinCount=5.0):
+
+  peeps = saObject.listAllPeople()
+  (haplotypes, nSamp) = peptides2hot(peptides, saObject, len(peeps) )
+
+  nPeps = len(peptides)
+
+  hItems = [ (h[0], h[1]) for h in haplotypes.items() ]
+
+  altMin = altMinCount/nSamp
+  altRmp = heterozygousProbWithTheta(theta, altMin, 1-altMin)
+
+
+  # for a given mask (1 means peptide dropped out, 0 means not)
+  # the RMP is deterministic
+  # when drop-in is small, the same mask will be seen often. This recycles...
+  cache = {}
+  # stores marginal theta-corrected RMPS and Naive rmps
+  posteriorT = [-1] * numIts
+  posteriorN = [-1] * numIts
+
+
+  print("Dropin", "Npeps", "RMP_theta", "RMP_theta_0.025", "RMP_theta_0.975", "RMP_naive", "RMP_naive_0.025", "RMP_naive_0.975", state.keyHeader(), sep="\t")
+  
+  for d in dropin:
+
+    # Monte carlo iterations
+    for pI in range(numIts):
+      
+      mask = ['0'] * nPeps
+      for i in range(nPeps):
+        if random.random() < d:
+          mask[i] = '1'
+        
+      mask = "".join(mask)
+
+      # cache miss
+      if mask not in cache:
+        # all of the heterozygous cases...
+        sumRMP = 0.
+        naiveRMP = 0.
+        for ((hap1, count1), (hap2, count2)) in combinations(hItems, 2):
+      
+          broken=False
+          for i in range(nPeps):
+            if mask[i] == '1': # masked base; simulates that this base is dropin
+              continue
+            if hap1[i] == '0' and hap2[i]=='0': # niether haplotype has the peptide. Cannot have left evidence.
+              broken=True
+              break
+        
+          if not broken:
+            sumRMP += heterozygousProbWithTheta(theta, max(altMinCount, count1)/nSamp, max(altMinCount, count2)/nSamp)
+            # 2pq
+            naiveRMP += (count1/nSamp) * (count2/nSamp) * 2
+            
+        # homozygous case
+        for (hap, count) in hItems:
+          broken=False
+          for i in range(nPeps):
+            if mask[i] == '1':
+              continue
+            if hap[i] == '0':
+              broken=True
+              break
+
+          if not broken:
+            sumRMP += homozygousProbWithTheta(theta, max(altMinCount, count)/nSamp)
+            # p^2
+            naiveRMP += (count/nSamp) * (count/nSamp)
+            
+      
+        if sumRMP < altRmp:
+          sumRMP = altRmp
+        elif sumRMP > 1: # many 5/2n can add up to more than one... as can the homo/hetero prob computation as it approaches a frequency of 1
+          sumRMP = 1.
+        
+        cache[mask] = (sumRMP, naiveRMP)
+
+      (rmpT, rmpN) = cache[mask]
+      posteriorT[pI] = rmpT
+      posteriorN[pI] = rmpN
+      
+    eRmpT = sum(posteriorT)/numIts
+    eRmpN = sum(posteriorN)/numIts
+    ordsT = numpy.quantile(posteriorT, [0.025, 0.975])
+    ordsN = numpy.quantile(posteriorN, [0.025, 0.975])
+
+    print(d, nPeps, eRmpT, ordsT[0], ordsT[1], eRmpN, ordsN[0], ordsN[1], state, sep="\t")
+    
+      
 def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC=-1, nUnknown=1, knownHaps = [], excludeList=[]):
   """
   Needs: suffix array object
@@ -1052,6 +1254,9 @@ def peptide_main(argv):
   parser.add_argument('-W', '--weights',                dest='W', help='Weights contamination events by the allele frequency', action="store_true")
   parser.add_argument('-l', '--loglikes',               dest='LL', help='Returns log likelihoods instead of raw likelihoods. Use when/if underflow occurs.', action="store_true")
   parser.add_argument('-N', '--all_nested_lrs',         dest='Nested', help='compute all nested LRs; -N 1 equivalent to -1 ; -N 2 computes all nested LRs that involve a 2-person mixture, -N 3 for 3-person...', default=0, type=int)
+  parser.add_argument('-r', '--rmp',                    dest='R', help="Computes the RMP using -R Monte Carlo simulations as per Woerner et al. 2019. Respects -P", default=-1, type=int)
+  
+  
   
   # manually compute the likelihood function; specifying particular people... (fast, but you need to manually specify your hypotheses)
   parser.add_argument('-K', '--known_individuals',      dest='KNOWN', help="Named known individuals under H1 (aka Hp).",type=str, default=[], nargs="+")
@@ -1073,18 +1278,19 @@ def peptide_main(argv):
   parser.add_argument('-n', '--no_theta',               dest='N', help="Turns off the theta computation (theta=0)", action="store_true")
   parser.add_argument('-t', '--theta',                  dest='T', help="Sets theta to a fixed constant", type=float, default=-1)
   # or use a point-estimate of theta:
-  parser.add_argument('-q', '--population_to_samples',  dest='Q', help="This is a file gives the population IDs of (some of the) samples specified in the suffix array (-S)", type=str, default="sampsToPops.tsv")
+  parser.add_argument('-q', '--population_to_samples',  dest='Q', help="This is a file gives the population IDs of (some of the) samples specified in the suffix array (-S)", type=str, default="")
 
 
   ## uncommon parameters
   ## for the suffix array
   parser.add_argument('-T', '--tempDir',                dest='Tmp', help="temporary directory for suffix array lookup", type=str, default='TMP')
-  parser.add_argument('-B', '--suffix_array_binary',    dest='Binary', help="the binary (executable) suffix array (include the path)", type=str, default='/home/becrloon/ProtengineR2/Proteos/proteos/workflows/suffix_array/builds/bin_x64_linux')
-  parser.add_argument('-C', '--cut_file',               dest='Cut', help="suffix array: how cuts (e.g., trypsin digest) are defined", type=str, default="/home/becrloon/ProtengineR2/Digests/trypsin_only.dig")
+  parser.add_argument('-B', '--suffix_array_binary',    dest='Binary', help="the binary (executable) suffix array (include the path)", type=str, default="/home/becrloon/ProtengineR3/zproj_profinman/builds/bin_x64_linux/profinman") #default='/home/becrloon/ProtengineR2/Proteos/proteos/workflows/suffix_array/builds/bin_x64_linux')
+#  parser.add_argument('-C', '--cut_file',               dest='Cut', help="suffix array: how cuts (e.g., trypsin digest) are defined", type=str, default="/home/becrloon/ProtengineR2/Digests/trypsin_only.dig")
 
   parser.add_argument('-@', '--apetail',                dest='APE', help="Additional arguments can be specified in the file", type=str, default='')
   parser.add_argument('-Q', '--quick_summaries',        dest='Summaries', help='Computes summary statistics on a peptide panel', action="store_true", default=False)
   parser.add_argument('-F', '--full_summaries',         dest='Full', help="Same as -Q, but it also prints who has which alleles (may be big!!)", action='store_true', default=False)
+  parser.add_argument('-G', '--proteogenomic_summaries', dest='ProtGenom', help="Provides genomic information of peptides", action='store_true', default=False)
 
 
   argv = preprocessArgv(argv)
@@ -1128,19 +1334,22 @@ def peptide_main(argv):
   
 
       # init the suffix array
-  saObject = initSuffixArray(results.Binary, results.Array, results.Tmp, results.Cut)
+  saObject = initSuffixArray(results.Binary, results.Array, results.Tmp)
   if saObject is None:
     parser.print_help()
     sys.exit(1)
 
   errors=0
-  if results.Summaries or results.Full:
+  if results.Summaries or results.Full or results.ProtGenom:
     peptidePanel = readSingleColumnFile(results.A, callback=None)
   elif results.W:
     (peptidePanel, weights) = readTwoColumnFile(results.A, callback=isoleucine2leucine)
     if None in weights:
       print("Problem parsing the weights from the peptide panel file. I need a two-column file of peptides; the first is the peptide, the second is the weight.", file=sys.stderr)
       errors+=1
+    elif len(weights) == 0:
+      print("Your peptide panel is ... blank?", file=sys.stderr)
+      sys.exit(1)
     try:
       weights = [ float(w) for w in weights ]
     except ValueError:
@@ -1153,14 +1362,16 @@ def peptide_main(argv):
     WEIGHT_ALLELES=True
     WEIGHTS=weights
 
-    if min(weights) < 0 or max(weights)>1:
+    if len(weights) and (min(weights) < 0 or max(weights)>1):
       print("Proper weights must be frequencies between 0 and 1...", file=sys.stderr)
       errors += 1
       
-  else:
+  elif results.R < 1: # no panel for RMPs...
     peptidePanel = readSingleColumnFile(results.A, callback=isoleucine2leucine)
+  else:
+    peptidePanel = []
     
-  if None in peptidePanel:
+  if None in peptidePanel and not( results.Summaries or results.Full or results.ProtGenom ):
     print("Problems parsing the peptide panel file: ", results.A, " at least one of the rows is... blank? irregular?", file=sys.stderr)
     parser.print_help()
     sys.exit(1)
@@ -1171,25 +1382,20 @@ def peptide_main(argv):
   samps2pops=None
   pops2samps=None
     
-  if results.Summaries or results.Full:
-    if samps2pops is None:
+  if results.Summaries or results.Full or results.ProtGenom:
+    if samps2pops is None and not results.Summaries:
       (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
-      
-    summarizePanel(peptidePanel, saObject, samps2pops, results.Full)
+    if results.ProtGenom:
+      proteoGenomicLookup(peptidePanel, saObject, samps2pops)
+    else:
+      summarizePanel(peptidePanel, saObject, samps2pops, results.Full)
     exit(0)
 
-  if results.Q is None or not os.path.isfile(results.Q):
+  if results.Q != "" and not os.path.isfile(results.Q):
     print("There is no file: " , results.Q , file=sys.stderr, sep="\n")
     parser.print_help()
     sys.exit(1)  
     
-  theta = results.T
-  if results.N:
-    theta = 0
-  elif theta < 0:
-    (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
-    theta = computeTheta(peptidePanel, saObject, pops2samps, 0)    
-
 
   peptidesDetected = set( readSingleColumnFile(results.P, callback=isoleucine2leucine) )
   if None in peptidesDetected:
@@ -1197,13 +1403,23 @@ def peptide_main(argv):
     parser.print_help()
     sys.exit(1)
     
+  # forcibly take an intersection of the panel and the detects (let's the panel vary and the detects stay samsies)
+  if results.R < 1: # but only if it's an LR. If it's an RMP there's no panel 
+    peptidesDetected = set([ p for p in peptidesDetected if p in peptidePanel] )
+  else: #case of RMP. we need the detects to be ordered and indexable
+    peptidesDetected = list( peptidesDetected )
 
-  if len(peptidePanel) == 0:
+  theta = results.T
+  if results.N or results.Q == "":
+    theta = 0
+  elif theta < 0:
+    (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
+    theta = computeTheta(peptidesDetected, saObject, pops2samps, 0)    
+    
+  if len(peptidePanel) == 0 and results.R<1:
     print("Your panel is blank. Nothing to compute", file=sys.stderr)
     sys.exit(0)
-    
-  # forcibly take an intersection of the panel and the detects (let's the panel vary and the detects stay samsies)
-  peptidesDetected = [ p for p in peptidesDetected if p in peptidePanel]
+
   
   if results.U < 0:
     print("The number of unknowns must be a non-negative integer! Not , ", results.U, file=sys.stderr)
@@ -1234,21 +1450,30 @@ def peptide_main(argv):
       print("Should never happen. The intersection of the database and the population: ", results.Pops, " is empty...", file=sys.stderr)
       exit(1)
 
-  if results.V != 0:
+  if results.R > 0:
 
-    state =State("CV" + str(results.V), results.S)
+    IS_RANDOMIZED = True
+    
+    state =State("RMP" + str(results.R), results.Pops, results.S)
+    
+    e = computeRMP(saObject, peptidesDetected, theta, results.R, results.D, state)
+    
+    
+  elif results.V != 0:
+
+    state =State("CV" + str(results.V), results.Pops, results.S)
     computeDenom=True
     if results.V < 0:
       computeDenom=False
       results.V = -results.V
-    
+
     e = crossValidate(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, results.V, computeDenom)
   elif results.KNOWN:
     #results.KNOWN  are diploid ids (eg, SA001)
     # they need to be mapped into haploid ids (eg, SA001_1, SA001_2) (below)
     known = []
     
-    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray, results.Tmp, results.Cut)
+    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray)
     allKnowns = saObjectKnown.listAllPeople()
     nFound = 0
     for k in results.KNOWN:
@@ -1266,15 +1491,15 @@ def peptide_main(argv):
             "is a list of them all...", "", sep="\n", file=sys.stderr)
       sys.exit(1)
 
-    state =State("LR_Known_" + ";".join(results.KNOWN) + ":" + str(results.U) + "_unknown", results.S)
+    state =State("LR_Known_" + ";".join(results.KNOWN) + ":" + str(results.U) + "_unknown", results.Pops, results.S)
     e = computeLRWithKnowns(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown, known, results.U)
   elif results.SingleSource:
-    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray, results.Tmp, results.Cut)
-    state =State("LR_Known_AllSingleSource", results.S)
+    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray)
+    state =State("LR_Known_AllSingleSource", results.Pops, results.S)
     e = allSingleSourceLR(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown)  
   elif results.Nested:
-    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray, results.Tmp, results.Cut)
-    state =State("LR_Nested_" + str(results.Nested), results.S)
+    saObjectKnown = initSuffixArray(results.Binary, results.KnownArray)
+    state =State("LR_Nested_" + str(results.Nested), results.Pops, results.S)
     e = allNestedLRs(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown, results.Nested)
   else:
     print("\n\nI don't know what to do!\n\n", file=sys.stderr)

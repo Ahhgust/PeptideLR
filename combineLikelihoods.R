@@ -48,16 +48,43 @@ if (n_distinct(combined$versionNumber) > 1) {
 }
 
 allcols <- colnames(combined)
-# column names may vary; these remain the same.
-groups <- allcols[ allcols != "Denom" & allcols !="Num" & allcols != "Filename" & allcols != "Theta"]
 
-group_by_at(combined, groups) %>%
+
+if ("RMP_theta" %in% allcols) {
+    # RMP processing.
+    combined %>%
+        group_by(
+            Dropin,
+            Population,
+            versionNumber,
+            randomSeed,
+            LikelihoodTransform
+        ) %>%
+        summarize(
+            Npeps=sum(Npeps),
+            RMP_theta=prod(RMP_theta),
+            RMP_theta_0.025=prod(RMP_theta_0.025),
+            RMP_theta_0.975=prod(RMP_theta_0.975),
+            RMP_naive=prod(RMP_naive),
+            RMP_naive_0.025=prod(RMP_naive_0.025),
+            RMP_naive_0.975=prod(RMP_naive_0.975)
+            ) %>%
+        ungroup()  -> summ
+
+} else {
+
+  # LR processing...
+  # column names may vary; these remain the same.
+  groups <- allcols[ allcols != "Denom" & allcols !="Num" & allcols != "Filename" & allcols != "Theta"]
+
+  group_by_at(combined, groups) %>%
     summarize(NumProduct=prod(Num),
               DenomProduct=prod(Denom),
               LR=NumProduct/DenomProduct,
               NCombined=n(),
               ) %>%
     ungroup() %>% arrange(desc(NumProduct)) -> summ
+}
 
 cat( readr::format_tsv(summ) )
 
