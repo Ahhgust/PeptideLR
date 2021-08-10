@@ -309,7 +309,10 @@ def summarizePanel(peptides, suffixarrayObject, samps2pops, verbose=False):
           popTots[pop] += 1
   
   curMat = search.getNextMatch()
-  print("Population", "Peptide", "Peptide20AA", "AlleleCount", "AlleleFrequency", "Total", sep="\t")
+  if verbose and samps2pops is None:
+    print("Population", "Peptide", "Peptide20AA", "AlleleCount", "Total", "AlleleFrequency", "Whos", sep="\t")
+  else:
+    print("Population", "Peptide", "Peptide20AA", "AlleleCount", "Total", "AlleleFrequency", sep="\t")
 
   popsOrdered = sorted(popTots.keys()) # fix the population ordering...
   
@@ -321,9 +324,11 @@ def summarizePanel(peptides, suffixarrayObject, samps2pops, verbose=False):
     pepSought = peptides[i] # may be in 20AA alphabet
     i += 1
     curOwn = curMat.getFullPeptideOwnership()
-    print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), sep="\t")
 
-    if verbose and samps2pops is not None:
+    if not verbose:
+      print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), sep="\t")
+    elif verbose and samps2pops is not None:
+      print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), sep="\t")
       # initialize all population counts to 0
       pepCounts[pepSought]={}
       for pop in popsOrdered:
@@ -337,7 +342,16 @@ def summarizePanel(peptides, suffixarrayObject, samps2pops, verbose=False):
           
       for pop in popsOrdered:
         print(pop, curPep, pepSought, pepCounts[pop], popTots[pop], (pepCounts[pop]+0.5)/(popTots[pop]+1) ,sep="\t")
-        
+
+    elif verbose and samps2pops is None:
+      dips= set()
+      for own in curOwn:
+        dipID = own[:-2]
+        dips.add(dipID)
+
+      owns = sorted(list(dips))
+      print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), ";".join(owns), sep="\t")
+      
     curMat = search.getNextMatch()
     
   
@@ -526,7 +540,7 @@ def findOwners(suffixArrayObject, peptides):
   """
 
   if not type(peptides) is list:
-    print("Peptides type error!", type(peptides), file=sys.stderr)
+    print("Peptides type error!", type(peptides), peptides, suffixArrayObject, sep="\n", file=sys.stderr)
     exit(1)
 
   if suffixArrayObject.detectsList is not None:
@@ -624,13 +638,14 @@ def peptides2hot(peptides, suffixarrayObject, nSamps, include=(), exclude=()):
   global WHITELIST
   global SAPOINTER
   useWhitelist = USE_WHITELIST and SAPOINTER==suffixarrayObject
-  
-  if len(include):
-    nSamps = len(include)
 
   if useWhitelist:
     nSamps = len(WHITELIST)
 
+  if len(include):
+    nSamps = len(include)
+
+    
   for i in range(nPeps):
     for index in idx[i]:
       who = whos[index]
@@ -697,12 +712,14 @@ def readSingleColumnFile(f, column2grab=1, sep="\t", header=False, callback=None
   None is the type contained in the vector element if the row index not referred to is not present.
   """
 
-  if f is None or not os.path.exists(f):
+  if f is None or (not os.path.exists(f) and f != "-"):
     print("Failed to find file: ", f , "", sep="\n", file=sys.stderr)
     return [None]
   
   if f.endswith(".gz"):
     h = gzip.open(f)
+  elif f == "-":
+    h = sys.stdin
   else:
     h = open(f)
 
@@ -723,7 +740,9 @@ def readSingleColumnFile(f, column2grab=1, sep="\t", header=False, callback=None
     else:
       col.append(None)
 
-  h.close()
+  if h != sys.stdin: 
+    h.close()
+    
   return(col)
 
 def readTwoColumnFile(f, column2grab=1, nextColumn2grab=2, sep="\t", header=False, callback=None, otherCallback=None):
@@ -742,12 +761,14 @@ def readTwoColumnFile(f, column2grab=1, nextColumn2grab=2, sep="\t", header=Fals
   such an approach does not work with a stream.... this does.
   """
 
-  if f is None or not os.path.exists(f):
+  if f is None or (not os.path.exists(f) and f != "-"):
     print("Failed to find file: ", f , "", sep="\n", file=sys.stderr)
     return [None]
   
   if f.endswith(".gz"):
     h = gzip.open(f)
+  elif f == "-":
+    h = sys.stdin
   else:
     h = open(f)
 
@@ -780,7 +801,9 @@ def readTwoColumnFile(f, column2grab=1, nextColumn2grab=2, sep="\t", header=Fals
     else:
       otherCol.append(None)
 
-  h.close()
+  if h != sys.stdin:
+    h.close()
+    
   return((col, otherCol))
 
 
@@ -849,6 +872,169 @@ def computeLRWithKnowns(saObject, alleles, peptides, theta, dropoutRate, dropinR
     print(",".join(dipIDs), tup[0], tup[1], denom[tup], numer[tup], theta, str(state), sep="\t")
   
 
+def getWeightedQuantile(sortedTups, index):
+  """
+  sortedTups is a list of tuples
+  each tuple has as index 0 the probability estimate and index 1 is the weight (number of individuals)
+  eg, (0.004, 20) -> means that 20 individuals have that likeihood
+  the tuples are sorted by the likelhood
+  index specifies an integer (0..sum of weights-1)
+  This returns the index associated with that index
+  """
+  cumu=0
+  for tup in sortedTups:
+    cumu += tup[1]
+    if cumu >= index:
+      return tup[0]
+
+  return tup[0]
+
+
+def getRank(tupsSorted, searchKey):
+  """
+  What count of individuals have a likeihood
+  """
+  cumu=0
+  for (like, count) in tupsSorted:
+    
+    if like > searchKey: 
+      return cumu
+    
+    cumu += count
+
+  return cumu
+
+def allGlobalLRs(saObject, alleles, peptides, theta, dropinRate, nMC, state, saKnown, numKnown, quantiles=[0.025, 0.975]):
+  """
+  Computes the proteogenomic likelihood
+  This approach makes no assumptions about LD between or within chromosomes, nor does it require a dropout parameter
+  """
+  if numKnown != 1:
+    print("Only works with single-samples at the moment...", file=sys.stderr)
+    exit(1)
+
+  alleleWeights=None
+  global WEIGHT_ALLELES
+  global WEIGHTS
+  if WEIGHT_ALLELES:
+    alleleWeights=WEIGHTS
+
+  global LOGLIKES
+  logTransform=LOGLIKES
+    
+  # provides diplotypes per person (sample ID -> a pair of hot-encoded haplotypes (strings)
+  allHapsUnknown = getAllDiplotypes(saObject, peptides)
+
+  # diplotypes (compressed into haplotypes by logical OR of hot encoded haplotypes per person)
+  # associated with the count of said diplotypes
+  unknownDips = {}
+  totDips = 0
+  for (who, haps) in allHapsUnknown.items():
+
+    hap1 = haps[0]
+    hap2 = haps[1]
+    hapLen = len(hap1)
+    dip = ['0'] * hapLen
+
+    for i in range(hapLen):
+      if hap1[i] == '1' or hap2[i] == '1':
+        dip[i] = '1'
+        
+    dipStr = ''.join(dip)
+    if dipStr not in unknownDips:
+      unknownDips[dipStr] = 1
+    else:
+      unknownDips[dipStr] += 1
+    totDips += 1
+
+  # make the quantiles discrete
+  qIndex = [ round(q * totDips) for q in quantiles ]
+
+  # ditto but for the known suffix array
+  allHapsKnown = getAllDiplotypes(saKnown, peptides)
+
+  print("ID", "NKnown", "NTotal", "Dropin_Rate", "Likelihood", "Likelihood_0.025", "Likelihood_0.975", "LikelihoodRank", state.keyHeader(), sep="\t")
+  
+  out = defaultdict(list)
+  
+  if numKnown==1:
+
+    for (dip, count) in unknownDips.items():
+      nDropins=0
+      weights=[]
+      
+      for i in range(hapLen):
+        if dip[i]=='0':
+          nDropins+=1
+          if WEIGHT_ALLELES:
+            if logTransform:
+              weights.append(numpy.log(alleleWeights[i]))
+            else:
+              weights.append(alleleWeights[i])
+            
+      weights.append(1)
+      weights.append(1)
+      
+      for C in dropinRate:
+
+        if logTransform:
+          weights[-1] = numpy.log(C) * nDropins  # how many drop-ins given the proposition of this diploid contributor. assume independence -> get prob
+          weights[-2] = numpy.log(1-C) * (hapLen-nDropins) # not-dropouts for the proposed
+          like = numpy.sum( weights )
+        else:
+          weights[-1] = pow(C, nDropins) # how many drop-ins given the proposition of this diploid contributor. assume independence -> get prob
+          weights[-2] = pow(1-C, hapLen-nDropins) # not-dropouts for the proposed
+#          weights[-2] = pow(0.5, hapLen-nDropins) # not-dropouts for the proposed
+          like = numpy.prod( weights )
+          
+        out[C].append( (like, count))
+
+    for C in out:
+      out[C].sort(key= lambda x: x[0])
+      likeSum = 0.
+      
+      for tup in out[C]:
+        
+        if logTransform:
+          likeSum += numpy.exp(tup[0])*tup[1]/totDips
+        else:
+          likeSum += (tup[0]*tup[1])/totDips
+          
+      print("Random" , "0", "1", C, likeSum, getWeightedQuantile(out[C], qIndex[0]), getWeightedQuantile(out[C], qIndex[1]), getRank(out[C], likeSum)/totDips, str(state), sep="\t") 
+
+    # hypothesis of known individual (each)
+    for (who, haps) in allHapsKnown.items():
+      weights = []
+      nDropins = 0
+      hap1 = haps[0]
+      hap2 = haps[1]
+    
+      for i in range(hapLen):
+        if hap1[i] == '0' and hap2[i] == '0':
+          nDropins += 1
+          if WEIGHT_ALLELES:
+            if logTransform:
+              weights.append(numpy.log(alleleWeights[i]))
+            else:
+              weights.append(alleleWeights[i])
+              
+      weights.append(1)
+      weights.append(1)
+      
+      for C in dropinRate:
+        if logTransform:
+          weights[-1] = numpy.log(C) * nDropins  # how many drop-ins given the proposition of this diploid contributor. assume independence -> get prob
+          weights[-2] = numpy.log(1-C) * (hapLen-nDropins) # not-dropouts for the proposed
+          like = numpy.sum( weights )
+        else:
+          weights[-1] = pow(C, nDropins) # how many drop-ins given the proposition of this diploid contributor. assume independence -> get prob
+          weights[-2] = pow(1-C, hapLen-nDropins) # not-dropouts for the proposed
+          like = numpy.prod( weights )
+
+        print(who, "1", "1", C, like, like, like, getRank(out[C], like)/totDips, str(state), sep="\t") 
+
+
+      
 def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, state, saKnown, numKnown):
   """
   Computes all nested likelihood ratios where the total sample size is numKnown (numerator and denominator)
@@ -857,7 +1043,7 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
   For a description of the arguments see allSingleSourceLR
 
   """
-  
+
   allHaps = getAllDiplotypes(saKnown, peptides)
   diploidIds = sorted(list(allHaps.keys()))
 
@@ -888,7 +1074,7 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
       # and consider all proper subsets (ie, the powerset save the identitical set)
       for subset in chain.from_iterable(combinations(peeps,n) for n in range(totalSS)):
         nKnown=len(subset)
-        subsetID = ",".join(subset)
+        subsetID = ",".join(sorted(subset))
         if nKnown==0:
           subsetID = "Random"
         kHaps = []
@@ -896,8 +1082,8 @@ def allNestedLRs(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nM
           kHaps.extend(allHaps[person])
           
         # key is: the known individuals , the # of unknowns
-        khapStr = ";".join(kHaps)
-        cacheKey = (khapStr, totalSS-nKnown)
+        #khapStr = ";".join(kHaps)
+        cacheKey = (subsetID, totalSS-nKnown) # subsetID was khapStr. May be non-deterministic
         if cacheKey not in denomCache:
           denom = computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=totalSS-nKnown, knownHaps = kHaps, excludeList=[])
           denomCache[ cacheKey ] = denom
@@ -918,6 +1104,8 @@ def allSingleSourceLR(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   """
   
   denom=computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRate, nMC, nUnknown=1, knownHaps = [], excludeList= [])
+  print("ID", "Dropin_Rate", "Dropout_Rate", "Likelihood", "Theta", state.keyHeader(), sep="\t")
+  
   for tup in denom.keys():
     print("RandomPerson", tup[0], tup[1], denom[tup], theta, str(state), sep="\t")
     
@@ -925,7 +1113,7 @@ def allSingleSourceLR(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   diploidIds = sorted(list(set( [f[:-2] for f in peeps] ))) # now diploid 
   hapIds = diploidIDsToHaploid(diploidIds) # and ordered, haploid
 
-  print("ID", "Dropin_Rate", "Dropout_Rate", "Likelihood", "Theta", state.keyHeader(), sep="\t")
+
   
   for i in range(0, len(hapIds), 2):
     (haplotypes1, nSampK) = peptides2hot(peptides, saKnown, 2, include= hapIds[i:(i+2)])
@@ -955,11 +1143,20 @@ def getAllDiplotypes(saObject, peptides):
   returns a dictionary associating the ID of the person to the pair of haplotypes..
   """
   d = {}
-  
-  peeps = saObject.listAllPeople()
+
+  global USE_WHITELIST
+  global WHITELIST
+  useWhitelist = USE_WHITELIST and SAPOINTER==saObject
+
+  if useWhitelist:
+    peeps = WHITELIST
+  else:
+    peeps = saObject.listAllPeople()
+    
   # remove the _1/_2 identifiers; get me the diploid sample IDs
   diploidIds = sorted(list(set( [f[:-2] for f in peeps] )))
   for person in diploidIds:
+
     ashap = diploidIDsToHaploid(person) # and remake the haploid ids so we know to include them.
     (haplotypes1, nSampK) = peptides2hot(peptides, saObject, len(peeps), include= ashap)
 
@@ -1144,6 +1341,7 @@ def computeEverything(saObject, alleles, peptides, theta, dropoutRate, dropinRat
   
   observed = makeHotVector(peptides, alleles)
 
+  
   global LOGLIKES
   logTransform=LOGLIKES
 
@@ -1266,8 +1464,8 @@ def peptide_main(argv):
 
   parser.add_argument('-p', '--peptide_hits',           dest='P', help="single-column file; no headers; peptides detected", type=str, default='')
   parser.add_argument('-a', '--peptide_panel',          dest='A', help="single-column file; no headers; peptides in panel", type=str, default='')
-  parser.add_argument('-c', '--contamination_rate',     dest='C', help="Contamination rate(s) (i.e., drop-in rates) used in the LR calculation.",type=float, default=[1e-6, 0.03, 0.05], nargs="+")
-  parser.add_argument('-d', '--dropout_rate',           dest='D', help="Dropout rate(s) (i.e., false negative rates) used in the LR calculation.",type=float, default=[1e-6, 0.05, 0.10], nargs="+")
+  parser.add_argument('-c', '--contamination_rate',     dest='C', help="Contamination rate(s) (i.e., drop-in rates) used in the LR calculation.",type=float, default=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10], nargs="+")
+  parser.add_argument('-d', '--dropout_rate',           dest='D', help="Dropout rate(s) (i.e., false negative rates) used in the LR calculation.",type=float, default=[0.05, 0.10, 0.15,0.20], nargs="+")
   parser.add_argument('-S', '--suffix_array',           dest='Array', help="the suffix array (directory) itself; used to generate *unknown* individuals; for single source, trypically used in denominator", type=str, default='/home/becrloon/ProtengineR2/Prot_1000_AC')
   parser.add_argument('-L', '--known_suffix_array',     dest='KnownArray', help="the suffix array (directory) itself; used to generate *known* individuals; for single-source, typically used in the numerator (and the denominator in more complex cases)", type=str, default='/home/becrloon/ProtengineR2/Prot_25_AC')
 
@@ -1279,6 +1477,7 @@ def peptide_main(argv):
   parser.add_argument('-l', '--loglikes',               dest='LL', help='Returns log likelihoods instead of raw likelihoods. Use when/if underflow occurs.', action="store_true")
   parser.add_argument('-N', '--all_nested_lrs',         dest='Nested', help='compute all nested LRs; -N 1 equivalent to -1 ; -N 2 computes all nested LRs that involve a 2-person mixture, -N 3 for 3-person...', default=0, type=int)
   parser.add_argument('-r', '--rmp',                    dest='R', help="Computes the RMP using -R Monte Carlo simulations as per Woerner et al. 2019. Respects -P", default=-1, type=int)
+  parser.add_argument('-g', '--global_likelihood',      dest='G', help="Computes the dropout-less global likelihood", default=1, type=int)
   
   
   
@@ -1413,7 +1612,7 @@ def peptide_main(argv):
   pops2samps=None
     
   if results.Summaries or results.Full or results.ProtGenom:
-    if samps2pops is None and not results.Summaries:
+    if samps2pops is None and not (results.Summaries or results.Full):
       (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
     if results.ProtGenom:
       proteoGenomicLookup(peptidePanel, saObject, samps2pops)
@@ -1445,20 +1644,20 @@ def peptide_main(argv):
     else:
       peptidesDetected = list( sorted(peptidesDetected ))
 
-    
-
   theta = results.T
   if results.N or results.Q == "":
     theta = 0
   elif theta < 0:
     (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
-    theta = computeTheta(peptidesDetected, saObject, pops2samps, 0)    
+    # bugfix: changed from the panel to the detects (but I had forgot that the detects need to be a list)
+    detectList = list([ p for p in peptidesDetected if p in peptidePanel])
+    theta = computeTheta(detectList, saObject, pops2samps, 0)    
     
   if len(peptidePanel) == 0 and results.R<1:
     print("Your panel is blank. Nothing to compute", file=sys.stderr)
     sys.exit(0)
 
-  
+
   if results.U < 0:
     print("The number of unknowns must be a non-negative integer! Not , ", results.U, file=sys.stderr)
     parser.print_help()
@@ -1494,7 +1693,7 @@ def peptide_main(argv):
     
     state =State("RMP" + str(results.R), results.Pops, results.S)
     
-    e = computeRMP(saObject, peptidesDetected, theta, results.R, results.D, state)
+    e = computeRMP(saObject, peptidesDetected, theta, results.R, results.C, state)
     
     
   elif results.V != 0:
@@ -1538,13 +1737,19 @@ def peptide_main(argv):
     saObjectKnown.detectsList = saObject.detectsList # needed for v2 of suffer.py. (caching)
     
     state =State("LR_Known_AllSingleSource", results.Pops, results.S)
+
     e = allSingleSourceLR(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown)  
-  elif results.Nested:
+  elif results.Nested or results.G:
     saObjectKnown = initSuffixArray(results.Binary, results.KnownArray, results.Tmp_N)
     saObjectKnown.detectsList = saObject.detectsList
-    
-    state =State("LR_Nested_" + str(results.Nested), results.Pops, results.S)
-    e = allNestedLRs(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown, results.Nested)
+
+    if results.Nested:
+      state =State("LR_Nested_" + str(results.Nested), results.Pops, results.S)
+      e = allNestedLRs(saObject, peptidesDetected, peptidePanel, theta, results.D, results.C, results.I, state, saObjectKnown, results.Nested)
+    else:
+      state =State("LR_Proteogenomic_" + str(results.G), results.Pops, results.S)
+      e = allGlobalLRs(saObject, peptidesDetected, peptidePanel, theta, results.C, results.I, state, saObjectKnown, results.G)
+      
   else:
     print("\n\nI don't know what to do!\n\n", file=sys.stderr)
     parser.print_help()

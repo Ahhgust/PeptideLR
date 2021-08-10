@@ -6,9 +6,13 @@ import glob
 import os
 import argparse
 import gzip
+import pparall
 
 MIN_THETA=1e-6
 DEFAULT_PROTENGINE_DIR = 'ProtengineR3' # must be the RELATIVE path. by default, this needs to be in the src/ directory for the main script
+DEFAULT_MAX_PROCS=10 # regardless of the number of CPUs on the system, this is the max asked for by default
+
+MIN_CONTAMINATION=0.05
 
 def runOrDie(command):
   """
@@ -45,7 +49,8 @@ def getArrays(callingFrom):
 def getPepLR(callingFrom):
   path = os.path.dirname( os.path.realpath(callingFrom) )
   lr = os.path.join(path,  "peptideLR.py")
-  return lr
+  combiner = os.path.join(path,  "combineLikelihoods.R -c " + str(MIN_CONTAMINATION))
+  return (lr, combiner)
 
 def getBinary(zprojDir):
   """
@@ -58,8 +63,12 @@ def getBinary(zprojDir):
   return None
 
 
-def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=None):
+def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, altArray=None, pepFreqs=None):
 
+
+  catCommand = 'cat' # cat (or catenate) ; unix utility
+  if os.name != 'posix':
+    catCommand = 'type' # cat equivalent on Windows...
 
   pepLRCommand = pepLR + " -B " + profinman + " -T " + os.path.join(outdir, args.N) + " -S " + nullArray 
 
@@ -89,14 +98,14 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=No
       command += " -a " + detectsFile + " > " + queryResultsFile
       print(command, file=fh)
 
-  # this performs the suffix array search (once)
-  # wrt to the null suffix array (1000 Genomes and the like)
-  if not os.path.isfile(queryResultsFile):
-    runOrDie(command)
+    # this performs the suffix array search (once)
+    # wrt to the null suffix array (1000 Genomes and the like)
+    if not os.path.isfile(queryResultsFile):
+      runOrDie(command)
 
-  if not os.path.isfile(queryResultsFile):
-    print("Cannot find file: " , queryResultsFile, "Must be some file permission issues...", file=sys.stderr)
-    exit(1)
+    if not os.path.isfile(queryResultsFile):
+      print("Cannot find file: " , queryResultsFile, "Must be some file permission issues...", file=sys.stderr)
+      exit(1)
 
   genomicFile = os.path.join(outdir, "genomicInformation.tsv")
   if args.G and not os.path.isfile(genomicFile):
@@ -115,7 +124,7 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=No
     queryResultsFileAlt =  os.path.join(outdir, "queryResults." + args.A + ".tsv")
     if not os.path.isfile(queryResultsFileAlt):
       # Note that the TMP dir changes 
-      pepLRCommand = pepLR + " -Q -B " + profinman + " -T " + os.path.join(outdir, args.A) + " -S " + altArray 
+      pepLRCommand = pepLR + " -F -B " + profinman + " -T " + os.path.join(outdir, args.A) + " -S " + altArray 
 
       with open(outfile, "w") as fh:
         command = pepLRCommand
@@ -144,7 +153,7 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=No
       if population == 'Total':
         panelFiles[(population, chrom)] = "-W -a " + filename
       else:
-        panelFiles[(population, chrom)] = "-W -a " + filename + " -P " + population
+        panelFiles[(population, chrom)] = "-W -a " + filename + " -P " + population + " -q " + os.path.join(nullArray, "samples2populations.tsv")
       
       if not population in handles:
         handles[population]={}
@@ -156,16 +165,18 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=No
   # create seperate PANEL files
   # one for each chromosome / population pair.
   if makePanels:
-    with open(queryResultsFile) as fh:
-      first=True
-      for line in fh:
-        if first:
-          first=False
-          continue
-        sp = line.rstrip().split("\t")
-        pop = sp[0]
-        pep = sp[2] # 20AA peptide sequence
-        freq = sp[-1]
+    if pepFreqs is None:
+      
+      with open(queryResultsFile) as fh:
+        first=True
+        for line in fh:
+          if first:
+            first=False
+            continue
+          sp = line.rstrip().split("\t")
+          pop = sp[0]
+          pep = sp[2] # 20AA peptide sequence
+          freq = sp[-1]
 
         if pep not in pep2chrom:
           print("Should never happen! No partition for pep:" , pep, file=sys.stderr)
@@ -176,14 +187,26 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=No
         if pop in handles and chrom in handles[pop]:
           fh = handles[pop][chrom]
           print(pep, freq, sep="\t", file=fh)
+    else: # user-supplied allele weights (frequencies)
+      for (pep, freq) in pepFreqs.items():
+        chrom = pep2chrom[pep]
 
+        for (pop, inner) in handles.items():
+          print(pep, freq, sep="\t", file=inner[chrom])
+        
   # close the barn door!
   for pop in handles:
     for chrom in handles[pop]:
       handles[pop][chrom].close()
 
-  # -Y is for the numberator/population suffix array
-  pepLRCommand = pepLR + " -B " + profinman + " -Z " + os.path.join(outdir, args.N) + " -S " + nullArray 
+  # -Y is for the numerator/population suffix array
+  pepLRCommand = pepLR + " -B " + profinman + " -Z " + os.path.join(outdir, args.N) + " -S " + nullArray + " -t " + str(args.T)
+
+  commands = []
+
+  logFH = open(os.path.join(outdir,"logFile.txt"), "a+")
+
+  rmpFiles = []
   # make per-chromosome annotations
   if args.R:
     
@@ -194,24 +217,39 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=No
     
     outfileBase = os.path.join(outdir, "RMPs", "RMP")
     command += " -r 1000"
-       
+    
     for block in detects:
 
       for pop in args.P:
         outfile = outfileBase + "." + pop + "." + block
         append = ""
-
+        rmpFiles.append(outfile)
+        
         if not os.path.isfile(outfile):
-          print(command , append , panelFiles[(pop, block)] ,  ">", outfile, sep=' ')
+          #print(command , append , panelFiles[(pop, block)] ,  ">", outfile, sep=' ')
+          finalCommand = " ".join( (command,  append , panelFiles[(pop, block)] ,  ">", outfile))
+          print(finalCommand, file=logFH)
+          if args.C < 2: # just one core. avoid fancy parallelism and just run it synchronously
+            os.system(finalCommand)
+          else:
+            commands.append(finalCommand)
 
-  # block-level (ie, chromosome level) RMPs/LRs get written to directories of that name  
+  # block-level (ie, chromosome level) RMPs/LRs get written to directories of that name
+
+  # LR computation.
+  # add in MC sampling (if that's requested)
+  if args.M>0:
+    pepLRCommand += " -i " + str(args.M)
+
+
+  likeFiles = []
   if args.L:
 
     if not os.path.isdir( os.path.join(outdir, "LRs")):
       os.mkdir(os.path.join(outdir, "LRs"))
     
-    command = pepLRCommand + " -p " + detectsFile + " -Y " + os.path.join(outdir, args.A) + " -L " + altArray
-    outfileBase = os.path.join(outdir, "LRs", "LR")
+    command = pepLRCommand + " -p " + detectsFile + " -Y " + os.path.join(outdir, args.A) + " -L " + altArray 
+    outfileBase = os.path.join(outdir, "LRs", "LR."+ str(args.L))
 
     if args.L==1: # -1 implementation is faster. Let's use that if we can.
       command += " -1"
@@ -222,10 +260,64 @@ def makeCommands(profinman, pepLR, args, detects, outdir, nullArray, altArray=No
       for pop in args.P:
         outfile = outfileBase + "." + pop + "." + block
         append = ""
-
+        likeFiles.append(outfile)
+        
         if not os.path.isfile(outfile):
-          print(command , append , panelFiles[(pop, block)] ,  ">", outfile, sep=' ')
+          #print(command , append , panelFiles[(pop, block)] ,  ">", outfile, sep=' ')
+          finalCommand = " ".join( (command , append , panelFiles[(pop, block)] ,  ">", outfile))
+          print(finalCommand, file=logFH)
+          if args.C < 2:
+            os.system(finalCommand)
+          else:
+            commands.append(finalCommand)
 
+  if args.W:
+    if args.W > 1:
+      print("Only single-contributor estimates of the LR are possible for the W-estimator: ", args.W, file=sys.stderr)
+      
+    if not os.path.isdir( os.path.join(outdir, "LRs")):
+      os.mkdir(os.path.join(outdir, "LRs"))
+
+    command = pepLRCommand + " -p " + detectsFile + " -Y " + os.path.join(outdir, args.A) + " -W -a - -L " + altArray + " -g " + str(args.W)
+    outfileBase = os.path.join(outdir, "LRs", "LR."+ str(args.W))
+    for pop in args.P:
+      outfile = outfileBase + "." + pop + ".genomic"
+      append = ""
+
+      catty = catCommand + " " + os.path.join(outdir, "Panels", "panel." + pop + ".* | ")
+      
+      if not os.path.isfile(outfile):
+
+        finalCommand = " ".join( (catty, command ,  ">", outfile))
+        print(finalCommand, file=logFH)
+        if args.C < 2:
+          os.system(finalCommand)
+        else:
+          commands.append(finalCommand)
+
+    
+  if len(commands)>0:
+    if pparall.inParallel(commands, args.C, check=True):
+      print("At least one command failed!", out=sys.stderr)
+      exit(1)
+
+  if len(rmpFiles):
+    outfile = os.path.join(outdir, "RMPs", "CombinedRMP.tsv")
+    if not os.path.isfile(outfile):
+      rmpCommand = "Rscript " + combiner + " " + " ".join(rmpFiles) + " > " + outfile
+      print(rmpCommand, file=logFH)
+      #print(rmpCommand)
+      os.system(rmpCommand)
+
+  if len(likeFiles):
+    outfile = os.path.join(outdir, "LRs", "CombinedLR." + str(args.L) + ".tsv")
+    if not os.path.isfile(outfile):
+      lrCommand = "Rscript " + combiner + " " + " ".join(likeFiles) + " > " + outfile
+      print(lrCommand, file=logFH)
+
+      os.system(lrCommand)
+    
+  logFH.close()  
       
 def buildArgvParser(parser):
   """
@@ -233,18 +325,22 @@ def buildArgvParser(parser):
   """
   parser.add_argument('-r', '--rmp', dest='R', help="Computes the RMP", action='store_true')
   parser.add_argument('-l', '--likelihoods', dest='L', help="Computes likelihoods for L contributors", type=int, default=0)
+  parser.add_argument('-w', '--w_likelihoods', dest='W', help="Computes the likelihood of Woerner et al.", type=int, default=0)
   parser.add_argument('-p', '--population', dest='P', help="Sets the reference population (P) in the likelihood estimation. Defaults to pooled frequencies (Total)", type=str, nargs="+", default=["Total"])
   parser.add_argument('-t', '--theta', dest='T', help="Turns on the theta-correction", default=MIN_THETA)
   parser.add_argument('-d', '--detects', dest='D', help="A file with the peptide detections...", default="-")
   parser.add_argument('-P', '--detects_peptide_colname', dest="pepcol", help="In -D, the column name for the peptide detections", default='Peptide')
   parser.add_argument('-C', '--detects_chromosome_colname', dest="chromcol", help="In -C, the column name for the chromosome (or any categorical variable used to partition the detections)", default='Chromosome')
+  parser.add_argument('-F', '--detects_frequency_colname', dest="freqcol", help="Rather than using population-specific frequencies use those defined in the column specified in the detects file ", default='')
+  parser.add_argument('-M', '--monte_carlo_sims', dest="M", help="Number of Monte Carlo simulations", default=0, type=int)
+  
 
   parser.add_argument('-q', '--query_allele_frequencies', dest='Q', help="Computes allele frequencies on --detects", action='store_true')
   parser.add_argument('-g', '--genomic', dest='G', help="Generates genomic information on peptides", action='store_true')
   parser.add_argument('-n', '--null_array', dest='N', help="The null/reference array. Default: HG38_Clean", default="HG38_Clean")
   parser.add_argument('-a', '--alt_array', dest='A', help="The comparison array", default="")
   parser.add_argument('-o', '--output_directory', dest='O', help="The directory where the analysis is conducted", default='')
-  parser.add_argument('-c', '--n_cpus', dest='C', help='The number of CPUs (degree of multi-processing) used. Only applies to RMP/LR calculation', default=1)
+  parser.add_argument('-c', '--n_cpus', dest='C', help='The number of CPUs (degree of multi-processing) used. Only applies to RMP/LR calculation', default=min(DEFAULT_MAX_PROCS, os.cpu_count()))
   parser.add_argument('-L', '--ls', dest='ls', help="Lists the suffix arrays in the default directory", action='store_true')
   parser.add_argument('-W', '--which_pops', dest='WhichPops', help="Lists the populations available in the suffix array", action='store_true')
   
@@ -280,9 +376,8 @@ def parser_main(argv):
     return 1
 
   profinman = getBinary( suffixArraysAndMore[binary])
-  lr = getPepLR(argv[0])
+  (lr, combiner) = getPepLR(argv[0])
 
-  
   if profinman is None:
     print("Problem finding profinman...", file=sys.stderr)
     return 1
@@ -328,27 +423,49 @@ def parser_main(argv):
   if results.L > 0 and altArray is None:
     print("Cannot be: You asked to compute a LR but you did not specify an alternative (alt) suffix array!", file=sys.stderr)
     exit(1)
+
+  if results.W > 0 and altArray is None:
+    print("Cannot be: You asked to compute a LR (W estimate) but you did not specify an alternative (alt) suffix array!", file=sys.stderr)
+    exit(1)
     
     
   refArray = suffixArraysAndMore[ results.N ]
-  if results.WhichPops:
+  otherPops = False
+  if len(results.P) > 1 or results.P[0] != 'Total':
+    otherPops=True
+    
+  if results.WhichPops or otherPops:
     popsFile = os.path.join(refArray, "samples2populations.tsv")
     # print the unique populations...
-    with open(popsFile) as fh:
-      d = set()
+    d = set()
+    with open(popsFile) as popsfh:
+
       first=True
-      print("Available populations:")
-      print("Total")
-      for line in fh:
+      if not otherPops:
+        print("Available populations:")
+        print("Total")
+        
+      for line in popsfh:
         if first:
           first=False
           continue
         s = line.rstrip().split("\t")
-        if s[-1] not in d:
+        if not otherPops and s[-1] not in d:
           print(s[-1])
         d.add(s[-1])
-    exit(0)
-    
+    if not otherPops:
+      exit(0)
+    else:
+      errs=0
+      for pop in results.P:
+        if pop != "Total" and pop not in d:
+          errs+=1
+          print("Cannot find population: ", pop, file=sys.stderr)
+
+      if errs:
+        print("One or more errors detected... the available populations are" , "\n".join(d), file=sys.stderr)
+        exit(1)
+          
   outdir = os.path.abspath(outdir)
   
   if not os.path.exists(outdir):
@@ -363,6 +480,13 @@ def parser_main(argv):
   if results.pepcol not in reader.fieldnames:
     print("Your detections file has no column: ", results.pepcol, file=sys.stderr)
     exit(1)
+
+  pepFreqs = None
+  if results.freqcol != "":
+    if results.freqcol not in reader.fieldnames:
+      print("Your detections file has no column: ", results.freqcol, file=sys.stderr)
+      exit(1)
+    pepFreqs = {} # peptide -> peptide frequency
     
   for row in reader:
     if results.chromcol != "":
@@ -376,10 +500,16 @@ def parser_main(argv):
       detects[chrom] = set()
     detects[chrom].add(pep)
 
+    if results.freqcol != "":
+      freq = float( row[ results.freqcol ] )
+      pepFreqs[pep]=freq
+    
   if fh != sys.stdin:
     fh.close()
 
-  makeCommands(profinman, lr, results, detects, outdir, refArray, altArray)
+    
+  if len(detects)>0:
+    makeCommands(profinman, lr, combiner, results, detects, outdir, refArray, altArray, pepFreqs)
 
 if __name__ == "__main__":
   parser_main(sys.argv)
