@@ -18,7 +18,7 @@ In this approach all peptide variations that are considered are those that deriv
 
 The peptides in question are assumed to have been derived from some set of proteins, proteins that have been in turn digested with some enzyme like [trypsin](https://en.wikipedia.org/wiki/Trypsin). <br>
 
-We need three pieces of information to compute a likelihood: \
+We need three pieces of information to compute a likelihood: 
 * A set of peptides
 * A reference profile (from some hypothesized contributor; to ask if the contributor "matches" the evidence")
 * A population database (to estimate the rarity of such a "match" in populations)
@@ -29,4 +29,7 @@ Starting with the first bullet, the peptides should be variable in the populatio
 The reference profile is also needed. This is the full proteome of some individual as estimated from whole genome/exome sequencing. Click [here](creation.md) to see how to make such a file. \
 <br>
 
-The last piece of information is the population database. This database was created in the same way as the reference profile, however it was done so on population database. In this case it is the publically available genotypes from the [gnomAD project](https://gnomad.broadinstitute.org/about) [(raw data)](https://gnomad.broadinstitute.org/downloads#v3-hgdp-1kg) which includes the [1000 Genomes Project](https://en.wikipedia.org/wiki/1000_Genomes_Project) and samples from the [Human Genome Diversity Panel](https://en.wikipedia.org/wiki/Human_Genome_Diversity_Project)
+The last piece of information is the population database. This database was created in the same way as the reference profile, however it was done so on population database. In this case it is the publically available genotypes from the [gnomAD project](https://gnomad.broadinstitute.org/about) [(raw data)](https://gnomad.broadinstitute.org/downloads#v3-hgdp-1kg) which includes the [1000 Genomes Project](https://en.wikipedia.org/wiki/1000_Genomes_Project) and samples from the [Human Genome Diversity Project](https://en.wikipedia.org/wiki/Human_Genome_Diversity_Project)
+
+The key to the model of Curran et al. is that it is possible for any person (as an example) to have left behind any piece of evidence. Any. As you might expect, however, the likelihood of such an outcome may be very (very) small. In the model some set of alleles are observed in evidence (*E*) and some person (or pair of haplotypes) is hypothesized to have contributed it. In the Curran model there are two basic premises: alleles can drop-in, or they can drop-out. Equivalently, if an allele can drop-in, it can *fail* to drop-in, as well as *fail* to drop-out. If we take a single individual who is heterozygous A/B and we have some allele A in evidence, if we know that they (and they alone) contributed to the sample, then we would say that A matches (did not drop out, <span style="text-decoration:overline">D</span>) and that B dropped out (D). Contamination is assessed at the level of the locus, and so you would also say that there is no contamination (<span style="text-decoration:overline">C</span>).
+ 
