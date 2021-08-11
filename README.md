@@ -26,15 +26,16 @@ The above formulation is assessed by considering alleles
   * Note: WSL is not a strict requirement for the code to run, but the installation instructions need to be made Windows-compatible 
 * g++
   * pthreads (*nix OR WSL)
-  * zlib_dev (development version)
+  * zlib1g-dev (zlib, development version)
   * mthreads (Windows only: ie, win32 threads. This should be standard)
 * Python 3.*
   * Numpy
+  * joblib
 
 <br>
 
 # Quick start for *nix including [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about) (WSL)
-Setup:
+User-level installation:
 <br>
 ```
 git clone --recursive https://github.com/Ahhgust/PeptideLR.git # download this project and Dr. Crysup's suffix array project
@@ -47,8 +48,10 @@ unzip ProtengineR3.zip
 for file in *.tbz; do tar -xf $file & done
 wait
 cd ..
+if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 ```
 <br>
+Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., /usr/local/bin) *needs to be a symlink* to that same file in the same directory!
 
 
 ## Installation notes
