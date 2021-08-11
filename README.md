@@ -35,7 +35,9 @@ The above formulation is assessed by considering alleles
 <br>
 
 # Quick start for *nix including [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about) (WSL)
-User-level installation:
+User-level installation: <br>
+Note this includes downloading ~4000 whole proteomes (twice), which takes a while!
+
 <br>
 ```
 git clone --recursive https://github.com/Ahhgust/PeptideLR.git # download this project and Dr. Crysup's suffix array project
