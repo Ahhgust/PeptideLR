@@ -29,6 +29,7 @@ The above formulation is assessed by considering alleles
   * mthreads (Windows only: ie, win32 threads. This should be standard)
 * Python 3.*
   * Numpy
+  * pparall
 
 <br>
 
@@ -42,7 +43,9 @@ chmod +x Buildit_x64_linux.sh && ./Buildit_x64_linux.sh && ln -s $PWD/pywrap/suf
 # and grab the public datasets (forgive the dropbox link but these files are BIG!)
 cd ..
 mkdir ProtengineR3 && cd ProtengineR3 && wget -O ProtengineR3.zip 'https://www.dropbox.com/sh/xp3wzs5fy9taqvl/AADjmPYTT201_MPtNXjVEZuaa?dl=1'
-unzip ProtengineR3.zip && tar -xf *tbz && rm ProtengineR3.zip
+unzip ProtengineR3.zip
+for file in *.tbz; do tar -xf $file & done
+wait
 cd ..
 ```
 <br>
