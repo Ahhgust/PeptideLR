@@ -51,7 +51,8 @@ cd ..
 if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 ```
 <br>
-Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., /usr/local/bin) *needs to be a symlink* to that same file in the same directory!
+
+Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., /usr/local/bin) **needs to be a symlink** to that same file in the same directory!
 
 
 ## Installation notes
