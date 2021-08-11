@@ -36,7 +36,8 @@ The above formulation is assessed by considering alleles
 
 # Quick start for *nix including [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about) (WSL)
 User-level installation: \
-Note this includes downloading ~4000 whole proteomes (twice), which takes a while! Maybe it's time to grab a coffee?
+Note this includes downloading ~4000 whole proteomes (twice), which takes a while!\
+Maybe it's time to grab a coffee?
 <br>
 
 ```
