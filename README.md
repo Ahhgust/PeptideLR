@@ -26,10 +26,10 @@ The above formulation is assessed by considering alleles
   * Note: WSL is not a strict requirement for the code to run, but the installation instructions need to be made Windows-compatible 
 * g++
   * pthreads (*nix OR WSL)
+  * zlib_dev (development version)
   * mthreads (Windows only: ie, win32 threads. This should be standard)
 * Python 3.*
   * Numpy
-  * pparall
 
 <br>
 
@@ -50,7 +50,7 @@ cd ..
 ```
 <br>
 
-<br>
+
 ## Installation notes
 The code base is designed to work on a single file system on a single operating system (ie, at most, one binary, Windows or *nix is supported). This is typically the case, but some more exotic situations (two operating systems mounting the same file system) are not handled<br>
 The code base is composed of three components:
