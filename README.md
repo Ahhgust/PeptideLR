@@ -1,7 +1,7 @@
 #
 
-The package herein can be used to compute a [semi-continuous likelihood ratio](about.md) \
-It can also be used to compute some genomic properties of peptides. Namely, where in the genome they might be found. Of importance, this query is done on a population database; so long as the allele is present (in at least one individual in the database) it is query-able.\
+The package herein can be used to compute a [semi-continuous likelihood ratio](about.md) using peptides detected by [liquid chromatography tandem mass spectrometry](https://en.wikipedia.org/wiki/Liquid_chromatography%E2%80%93mass_spectrometry) (LC-MS/MS) \
+It can also be used to compute some genomic properties of peptides. Namely, where in the genome they might be found. Of importance, this query is done on a population database; so long as the allele is present (in at least one individual in the database) it is query-able. \
 
 # Dependencies (pretty standard)
 * For Windows users
