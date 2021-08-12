@@ -1,19 +1,23 @@
 #
 
 The package herein can be used to compute a semi-continuous likelihood ratio [(to know more about what that is and how we do it, click here!)](about.md) using peptides detected by [liquid chromatography tandem mass spectrometry](https://en.wikipedia.org/wiki/Liquid_chromatography%E2%80%93mass_spectrometry) (LC-MS/MS). \
-It can also be used to compute some genomic properties of peptides. Namely, where in the genome they might be found. Of importance, this query is done on a population database; so long as the allele is present (in at least one individual in the database) it is query-able. \
+It can also be used to compute some genomic properties of peptides. Namely, where in the genome they might be found. Of importance, this query is done on a population database; so long as the allele is present (in at least one individual in the database) it is query-able. 
 
 # Dependencies (pretty standard)
 * For Windows users
   * [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about) (WSL)
   * Note: WSL is not a strict requirement for the code to run, but the installation instructions need to be made Windows-compatible 
 * g++
-  * pthreads (*nix OR WSL)
+  * pthreads 
   * zlib1g-dev (zlib, development version)
-  * mthreads (Windows only: ie, win32 threads. This should be standard)
 * Python 3.*
   * Numpy
   * joblib
+
+* Compute recommendations
+  * ~65 Gb of storage (to store the ~4000 whole proteomes)
+  * 12 CPUs (the more the better)
+  * 16 Gb of memory (less important, but the more the better)
 
 <br>
 
@@ -31,7 +35,7 @@ chmod +x Buildit_x64_linux.sh && ./Buildit_x64_linux.sh && ln -s $PWD/pywrap/suf
 cd ..
 mkdir ProtengineR3 && cd ProtengineR3 && wget -O ProtengineR3.zip 'https://www.dropbox.com/sh/xp3wzs5fy9taqvl/AADjmPYTT201_MPtNXjVEZuaa?dl=1'
 unzip ProtengineR3.zip
-for file in *.tbz; do tar -xf $file & done
+for file in *.tbz; do tar -xf $file && rm $file & done
 wait
 cd ..
 if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
