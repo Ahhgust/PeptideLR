@@ -16,7 +16,7 @@ It can also be used to compute some genomic properties of peptides. Namely, wher
 
 * Compute recommendations
   * ~65 Gb of storage (to store the ~4000 whole proteomes)
-  * 12 CPUs (the more the better)
+  * 8 cores (soft requirement; the more the better)
   * 16 Gb of memory (less important, but the more the better)
 
 <br>
