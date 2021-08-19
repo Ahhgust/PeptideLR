@@ -51,7 +51,7 @@ The code-base is designed to work on peptides, specifically on peptides that are
 The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). The file itself needs to have two named columns (see below; additional columns are okay and the order of the columns is arbitrary). The first column (peptide_seq) needs to give the peptide, and the second column gives the chromosome associated with this chromosome. Technically the "chromosome" is used to group peptides; that is, the likelihood is assessed on each set of peptides that are considered to be (biologically) independent (in which case the label "chromosome" needs to stay). Note that a peptide may not be associated with multiple chromosomes. Let's say we want to look up the information on four peptides:
 <br>
 
-| peptide_seq | chromosome |
+| Peptide | Chromosome |
 | :---------: | :--------: |
 | AASSQTPTMCTTTVTIK  | 18 |
 | AASSQTPTMCTTTVTVK  | 18 |
@@ -69,11 +69,13 @@ Let's see what sort of genomic annotations are associated with these peptides. T
 Now, select the above table (including the headers!) and copy it (ctrl+c). Let's make a file with this contents: Type:
 <br>
 
-`cat > peptides.tsv`
+`tr -d ' ' | cat > peptides.tsv`
 
 <br>
 
 and paste the content of the copied table (e.g., the top-left icon in putty) and type ctrl+d (which marks the end of file).
+
+Let's begin with pulling out some genomic annotations associated with these peptides. To do so
 
 
 
