@@ -27,8 +27,9 @@ Note this includes downloading ~4000 whole proteomes (twice), which takes a whil
 Maybe it's time to grab a coffee?
 <br>
 
+## Installation
 ```
-git clone --recursive https://github.com/Ahhgust/PeptideLR.git # download this project and Dr. Crysup's suffix array project
+git clone --recursive https://github.com/Ahhgust/PeptideLR.git # download this project and Dr. Crysup's suffix array project (protengine)
 cd PeptideLR/protengine # and build
 chmod +x Buildit_x64_linux.sh && ./Buildit_x64_linux.sh && ln -s $PWD/pywrap/suffer.py ..
 # and grab the public datasets (forgive the dropbox link but these files are BIG!)
@@ -42,10 +43,21 @@ if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 ```
 <br>
 
-Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., /usr/local/bin) **needs to be a symlink** to that same file in the same directory!
+Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., in /usr/bin or /usr/local/bin) **needs to be a symlink**!
+
+## Walk-through
+The code-base is designed to work on peptides, specifically those that are polymorphic in populations.
 
 
-## Installation notes
+| peptide_seq | chromosome |
+| :---------: | :--------: |
+| AASSQTPTMCTTTVTIK  | 18 |
+| AASSQTPTMCTTTVTVK  | 18 |
+| ADFSGMSAEK  |      | 18 |
+| ADFSGMSTEK  |      | 18 |
+
+
+## Installation notes and other gotchas
 The code base is designed to work on a single file system on a single operating system (ie, at most, one binary, Windows or *nix is supported). This is typically the case, but some more exotic situations (two operating systems mounting the same file system) are not handled<br>
 The code base is composed of three components:
 * The data (suffix arrays). Data must be stored in a directory call ProtengineR3/ in the same directory as the installation (PeptideLR/). Symbolic links are okay.
