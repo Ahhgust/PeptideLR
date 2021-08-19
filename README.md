@@ -60,8 +60,18 @@ The code expects tabular data (tab-delimited). These data need to be written as 
 
 <br>
 Let's see what sort of genomic annotations are associated with these peptides. To do so, let's make a directory to work in (let's call it foo/. Pick some other name if that name has already been chosen.) <br>
+
 `mkdir foo && cd foo`
 
+<br>
+
+Now, select the above table (including the headers!) and copy it (ctrl+c). Let's make a file with this contents: Type: <br>
+
+`cat > peptides.tsv`
+
+<br>
+
+and paste the content of the copied table (e.g., the top-left icon in putty).
 
 
 ## Installation notes and other gotchas
