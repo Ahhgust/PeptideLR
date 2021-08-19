@@ -53,8 +53,8 @@ The code-base is designed to work on peptides, specifically those that are polym
 | :---------: | :--------: |
 | AASSQTPTMCTTTVTIK  | 18 |
 | AASSQTPTMCTTTVTVK  | 18 |
-| ADFSGMSAEK  |      | 18 |
-| ADFSGMSTEK  |      | 18 |
+| ADFSGMSAEK         | 18 |
+| ADFSGMSTEK         | 18 |
 
 
 ## Installation notes and other gotchas
