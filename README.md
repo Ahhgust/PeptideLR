@@ -75,7 +75,15 @@ Now, select the above table (including the headers!) and copy it (ctrl+c). Let's
 
 and paste the content of the copied table (e.g., the top-left icon in putty) and type ctrl+d (which marks the end of file).
 
-Let's begin with pulling out some genomic annotations associated with these peptides. To do so
+Let's begin with pulling out some genomic annotations associated with these peptides. To do so type:
+<br>
+
+`lrWrapper.py -d peptides.tsv -l HG38_Clean -g`
+
+<br>
+This command takes a little while to complete. What it is doing is searching every protein sequence in every individual from the 1000 Genomes Project, and checking to see which individuals have a tryptic peptide that is equivalent to the ones queried. Of those individuals, it then pulls out the information on which proteins correspond to these peptides.
+
+
 
 
 
