@@ -46,7 +46,7 @@ if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., in /usr/bin or /usr/local/bin) **needs to be a symlink**!
 
 ## Walk-through
-The code-base is designed to work on peptides, specifically those that are polymorphic in populations.
+The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). To make the code easier to use a wrapper script (`lrWrapper.py`).
 
 
 | peptide_seq | chromosome |
