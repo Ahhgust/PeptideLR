@@ -46,7 +46,7 @@ if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., in /usr/bin or /usr/local/bin) **needs to be a symlink**!
 
 ## Walk-through
-The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). To make the code easier to use a wrapper script (`lrWrapper.py`).
+The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). To make the code easier to use a wrapper script (`lrWrapper.py`) was made. The wrapper can be used to compute a [semi-continuous likelihood](about.md), [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295), as well as basic assessments of peptide allele frequency and it's proteo-genomic location(s).
 
 
 | peptide_seq | chromosome |
