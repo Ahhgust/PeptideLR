@@ -46,8 +46,10 @@ if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., in /usr/bin or /usr/local/bin) **needs to be a symlink**!
 
 ## Walk-through
-The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). To make the code easier to use a wrapper script (`lrWrapper.py`) was made. The wrapper can be used to compute a [semi-continuous likelihood](about.md), [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295), as well as basic assessments of peptide allele frequency and it's proteo-genomic location(s).
+The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. To make the code easier to use a wrapper script (`lrWrapper.py`) was made. The wrapper can be used to compute a [semi-continuous likelihood](about.md), [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295), as well as basic assessments of peptide allele frequency and it's proteo-genomic location(s).
 
+The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). The file itself needs to have two named columns (see below; additional columns are okay and the order of the columns is arbitrary). The first column (peptide_seq) needs to give the peptide, and the second column gives the chromosome associated with this chromosome. Technically the "chromosome" is used to group peptides; that is, the likelihood is assessed on each set of peptides that are considered to be (biologically) independent (in which case the label "chromosome" needs to stay). Note that a peptide may not be associated with multiple chromosomes. Let's say we want to look up the information on four peptides:
+<br>
 
 | peptide_seq | chromosome |
 | :---------: | :--------: |
@@ -55,6 +57,11 @@ The code-base is designed to work on peptides, specifically on peptides that are
 | AASSQTPTMCTTTVTVK  | 18 |
 | ADFSGMSAEK         | 18 |
 | ADFSGMSTEK         | 18 |
+
+<br>
+Let's see what sort of genomic annotations are associated with these peptides. To do so, let's make a directory to work in (let's call it foo/. Pick some other name if that name has already been chosen.) <br>
+`mkdir foo && cd foo`
+
 
 
 ## Installation notes and other gotchas
