@@ -102,7 +102,7 @@ When the above completes it will create a directory ( `peptides/` ). In it will 
 
 <br>
 
-This file gives the peptide sequence (in a 19 amino acid alphabet, with **I**sos -> **L**eus), the 20 amino-acid version (what was queried), and the protein ID (EnsemblID), as well as the genomic coordinates of the protein (GRCh38/hg38, chromosome, start, stop, strand) of the protein (not the peptide). What these annotations mean is that there is at least one individual in the 1000 Genomes +HGDP dataset that has these tryptic peptides, and the protein records associated with these peptides are as described above.
+This file gives the peptide sequence (in a 19 amino acid alphabet, with **I**sos -> **L**eus), the 20 amino-acid version (what was queried), and the protein ID (EnsemblID), as well as the genomic coordinates of the protein (GRCh38/hg38, chromosome, start, stop, strand) of the protein (not the peptide). What these annotations mean is that there is at least one individual in the [1000 Genomes + HGDP] (https://gnomad.broadinstitute.org/downloads#v3-hgdp-1kg) dataset that has these tryptic peptides, and the protein records associated with these peptides are as described above.
 
 <br><br>
 
