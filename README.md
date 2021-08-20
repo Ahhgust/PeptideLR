@@ -48,7 +48,7 @@ Note, this program can be installed at the system level, but the appropriate (us
 ## Walk-through
 The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. To make the code easier to use a wrapper script (`lrWrapper.py`) was made. The wrapper can be used to compute a [semi-continuous likelihood](about.md), [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295), as well as basic assessments of peptide allele frequency and it's proteo-genomic location(s).
 
-The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). The file itself needs to have two named columns (see below; additional columns are okay and the order of the columns is arbitrary). The first column (peptide_seq) needs to give the peptide, and the second column gives the chromosome associated with this chromosome. Technically the "chromosome" is used to group peptides; that is, the likelihood is assessed on each set of peptides that are considered to be (biologically) independent (in which case the label "chromosome" needs to stay). Note that a peptide may not be associated with multiple chromosomes. Let's say we want to look up the information on four peptides:
+The code expects tabular data (tab-delimited). These data need to be written as a regular file (no streaming). The file itself needs to have two named columns (see below; additional columns are okay and the order of the columns is arbitrary). The first column (Peptide) needs to give the peptide, and the second column gives the Chromosome associated with a given peptide. Technically the "chromosome" is used to group peptides; that is, the likelihood is assessed on each set of peptides that share the same group. Chromosomes are (biologically) independent (in which case the label "chromosome" needs to stay), but in principle protein identifiers (or chromosome + megabase identifiers) can be used if there is a reasonable belief that such groupings make sense (knowing that the groups need to represent statistically independent pieces of biological information). Note that a peptide may not be associated with multiple chromosomes. Let's say we want to look up the information on four peptides:
 <br>
 
 | Peptide | Chromosome |
@@ -81,7 +81,24 @@ Let's begin with pulling out some genomic annotations associated with these pept
 `lrWrapper.py -d peptides.tsv -l HG38_Clean -g`
 
 <br>
-This command takes a little while to complete. What it is doing is searching every protein sequence in every individual from the 1000 Genomes Project, and checking to see which individuals have a tryptic peptide that is equivalent (remembering that Is and Ls are equivalent)  to the ones queried. Of those individuals, it then pulls out the information on which proteins correspond to these peptides.
+This command takes a little while to complete. What it is doing is searching every protein sequence in every individual from the 1000 Genomes Project (HG38_Clean), and checking to see which individuals have a tryptic peptide that is equivalent (remembering that Is and Ls are mass-equivalent) to the ones queried. Of those individuals, it then pulls out the information on which proteins correspond to these peptides.
+
+<br>
+When the above completes it will create a directory (`peptides/`). In it will be a file (`genomicInformation.tsv`) that looks like:
+
+| Peptide            | Peptide20AA          |   EnsemblID       | Chromosome  |   Start   |  Stop      |  Strand |
+| :----------------: | :------------------: |   :-------------: | :---------: | :-------: | :--------: | :-----: |
+| AASSQTPTMCTTTVTLK  |AASSQTPTMCTTTVTIK     |   ENSP00000257197 | chr18       | 31130802  |  31162594  |      -  |
+| AASSQTPTMCTTTVTLK  |AASSQTPTMCTTTVTIK     |   ENSP00000257198 | chr18       | 31130513  |  31162594  |      -  |
+| AASSQTPTMCTTTVTVK  |AASSQTPTMCTTTVTVK     |   ENSP00000257197 | chr18       | 31130802  |  31162594  |      -  |
+| AASSQTPTMCTTTVTVK  |AASSQTPTMCTTTVTVK     |   ENSP00000257198 | chr18       | 31130513  |  31162594  |      -  |
+| ADFSGMSAEK         |ADFSGMSAEK            |   ENSP00000331368 | chr18       | 63978308  |  63987278  |      +  |
+| ADFSGMSAEK         |ADFSGMSAEK            |   ENSP00000438328 | chr18       | 63983700  |  63987278  |      +  |
+| ADFSGMSAEK         |ADFSGMSAEK            |   ENSP00000381072 | chr18       | 63978308  |  63987278  |      +  |
+| ADFSGMSTEK         |ADFSGMSTEK            |   ENSP00000331368 | chr18       | 63978308  |  63987278  |      +  |
+| ADFSGMSTEK         |ADFSGMSTEK            |   ENSP00000438328 | chr18       | 63983700  |  63987278  |      +  |
+| ADFSGMSTEK         |ADFSGMSTEK            |   ENSP00000381072 | chr18       | 63978308  |  63987278  |      +  |
+
 
 
 
