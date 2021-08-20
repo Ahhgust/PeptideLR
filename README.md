@@ -84,7 +84,8 @@ Let's begin with pulling out some genomic annotations associated with these pept
 This command takes a little while to complete. What it is doing is searching every protein sequence in every individual from the 1000 Genomes Project (HG38_Clean), and checking to see which individuals have a tryptic peptide that is equivalent (remembering that Is and Ls are mass-equivalent) to the ones queried. Of those individuals, it then pulls out the information on which proteins correspond to these peptides.
 
 <br>
-When the above completes it will create a directory (`peptides/`). In it will be a file (`genomicInformation.tsv`) that looks like:
+
+When the above completes it will create a directory ( `peptides/` ). In it will be a file ( `genomicInformation.tsv` ) that looks like:
 
 | Peptide            | Peptide20AA          |   EnsemblID       | Chromosome  |   Start   |  Stop      |  Strand |
 | :----------------: | :------------------: |   :-------------: | :---------: | :-------: | :--------: | :-----: |
