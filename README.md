@@ -104,9 +104,10 @@ When the above completes it will create a directory ( `peptides/` ). In it will 
 
 This file gives the peptide sequence (in a 19 amino acid alphabet, with **I**sos -> **L**eus), the 20 amino-acid version (what was queried), and the protein ID (EnsemblID), as well as the genomic coordinates of the protein (GRCh38/hg38, chromosome, start, stop, strand) of the protein (not the peptide). What these annotations mean is that there is at least one individual in the [1000 Genomes + HGDP](https://gnomad.broadinstitute.org/downloads#v3-hgdp-1kg) dataset that has these tryptic peptides, and the protein records associated with these peptides are as described above.
 
-<br><br>
+<br>
 
-As you can tell each peptide is associated with several different protein sequences, though note that alternative transcripts of the same gene are considered different proteins.
+The data in this table are presented in a "[tidy](https://r4ds.had.co.nz/tidy-data.html)" format. If a peptide is associated with multiple proteins (as is expected), the same **Peptide** be repeated across multiple rows.
+It is a reasonable bet that many of these proteins correspond to alternative transcripts of the same gene are considered different proteins, a fact that is alluded to by the shared start/stop coordinates.
 
 
 
