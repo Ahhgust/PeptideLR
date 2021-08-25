@@ -111,12 +111,17 @@ It is a reasonable bet that many of these proteins correspond to alternative tra
 
 <br>
 
+This utility can also be used to estimate the peptide allele frequency. Even though the GVPs that we are searching for have a basis in the genome (they overlap some number of SNPs), estimating the GVP allele frequency can be tricky. For instance, if you have a biallelic non-synonymous SNP, any other protein-altering SNP that lands in the same region (regardless if you're looking for that SNP) will impact the frequency (generally lower) of one or both of the GVPs sought. Hard examples are when the GVP is multi-copy (within the same chromosome), in which case there is no way to estimate the allele frequency unless you know which SNPs cause the formation of the GVP *and* you know the co-variance (that is, which haploid individuals have both alleles). 
+Instead, we estimate the allele frequency of peptides (GVPs) directly in the protein sequences to circumvent these issues. Namely, we consider:
+<!-- |  \cup (all haploid individuals that have some GVP)   | -->
+
+<br>
+
 # RMP
 
   `lrWrapper.py` uses caching to speed up the computation. In short, the suffix array is large, and while the search times are fast, it is faster still to keep a local copy of the query (and result). e.g., the directory `pep/HG38_Clean` has the results of search the peptides in `pep/rawDetects.tsv` in the HG38_Clean suffix array. To see the benefits of using a local cache, try running <br>
 
 `lrWrapper.py -d peptides.tsv -n HG38_Clean -r`
-
 
 The likelihood ratio formulation of `lrWrapper.py`
 
