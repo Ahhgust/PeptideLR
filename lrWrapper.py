@@ -90,7 +90,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
   if not os.path.isfile(outfile):
     with open(outfile, "w") as fh:
       command = pepLRCommand
-      if os.path.isfile( os.path.join(nullArray, "samples2populations.tsv")  ):
+      if False and os.path.isfile( os.path.join(nullArray, "samples2populations.tsv")  ):
         command += " -F"
       else:
         command += " -Q"
