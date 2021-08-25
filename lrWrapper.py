@@ -298,7 +298,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
     
   if len(commands)>0:
     if pparall.inParallel(commands, args.C, check=True):
-      print("At least one command failed!", out=sys.stderr)
+      print("At least one command failed!", file=sys.stderr)
       exit(1)
 
   if len(rmpFiles):

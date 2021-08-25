@@ -78,7 +78,7 @@ and paste the content of the copied table (e.g., the top-left icon in putty) and
 Let's begin with pulling out some genomic annotations associated with these peptides. To do so type:
 <br>
 
-`lrWrapper.py -d peptides.tsv -l HG38_Clean -g`
+`lrWrapper.py -d peptides.tsv -n HG38_Clean -g`
 
 <br>
 This command takes a little while to complete. What it is doing is searching every protein sequence in every individual from the 1000 Genomes Project (HG38_Clean), and checking to see which individuals have a tryptic peptide that is equivalent (remembering that Is and Ls are mass-equivalent) to the ones queried. Of those individuals, it then pulls out the information on which proteins correspond to these peptides.
@@ -107,7 +107,18 @@ This file gives the peptide sequence (in a 19 amino acid alphabet, with **I**sos
 <br>
 
 The data in this table are presented in a "[tidy](https://r4ds.had.co.nz/tidy-data.html)" format. If a peptide is associated with multiple proteins (as is expected), the same **Peptide** be repeated across multiple rows.
-It is a reasonable bet that many of these proteins correspond to alternative transcripts of the same gene are considered different proteins, a fact that is alluded to by the shared start/stop coordinates.
+It is a reasonable bet that many of these proteins correspond to alternative transcripts of the same gene. They are different proteins, but proteins that likely correspond to the same gene, a fact that is alluded to by the shared start/stop coordinates.
+
+<br>
+
+# RMP
+
+  `lrWrapper.py` uses caching to speed up the computation. In short, the suffix array is large, and while the search times are fast, it is faster still to keep a local copy of the query (and result). e.g., the directory `pep/HG38_Clean` has the results of search the peptides in `pep/rawDetects.tsv` in the HG38_Clean suffix array. To see the benefits of using a local cache, try running <br>
+
+`lrWrapper.py -d peptides.tsv -n HG38_Clean -r`
+
+
+The likelihood ratio formulation of `lrWrapper.py`
 
 
 
@@ -116,7 +127,7 @@ The code base is designed to work on a single file system on a single operating 
 The code base is composed of three components:
 * The data (suffix arrays). Data must be stored in a directory call ProtengineR3/ in the same directory as the installation (PeptideLR/). Symbolic links are okay.
 * The suffix array source code. The LR calculator uses underlying routines (written in C/C++) from Protengine (the suffix array and related code). Protengine must be installed/compiled exactly as it is described in the *Setup* section.
-* The LR calculator itself. The code for this is written in Python with minimal dependencies (v3.*, though note it does need numpy)
+
 ## Funding
 
 This research is based upon work supported in part by the Office of the Director of National Intelligence (ODNI), Intelligence Advanced Research Projects Activity (IARPA), via contract number 2018-18041000003. The views and conclusions contained herein are those of the authors and should not be interpreted as necessarily representing the official policies, either expressed or implied, of ODNI, IARPA, or the U.S. Government. The U.S. Government is authorized to reproduce and distribute reprints for governmental purposes notwithstanding any copyright annotation therein.

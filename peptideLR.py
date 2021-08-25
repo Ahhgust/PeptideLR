@@ -1571,6 +1571,7 @@ def peptide_main(argv):
   errors=0
   if results.Summaries or results.Full or results.ProtGenom:
     peptidePanel = readSingleColumnFile(results.A, callback=None)
+    weights=[]
   elif results.W:
     (peptidePanel, weights) = readTwoColumnFile(results.A, callback=isoleucine2leucine)
     if None in weights:
