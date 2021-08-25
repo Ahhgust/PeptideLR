@@ -166,7 +166,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
   # one for each chromosome / population pair.
   if makePanels:
     if pepFreqs is None:
-      
+
       with open(queryResultsFile) as fh:
         first=True
         for line in fh:
@@ -178,15 +178,16 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
           pep = sp[2] # 20AA peptide sequence
           freq = sp[-1]
 
-        if pep not in pep2chrom:
-          print("Should never happen! No partition for pep:" , pep, file=sys.stderr)
-          exit(1)
+          if pep not in pep2chrom:
+            print("Should never happen! No partition for pep:" , pep, file=sys.stderr)
+            exit(1)
         
-        chrom = pep2chrom[pep]
-        # population we care about
-        if pop in handles and chrom in handles[pop]:
-          fh = handles[pop][chrom]
-          print(pep, freq, sep="\t", file=fh)
+          chrom = pep2chrom[pep]
+          # population we care about
+          if pop in handles and chrom in handles[pop]:
+            fh = handles[pop][chrom]
+            print(pep, freq, sep="\t", file=fh)
+          
     else: # user-supplied allele weights (frequencies)
       for (pep, freq) in pepFreqs.items():
         chrom = pep2chrom[pep]
