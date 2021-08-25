@@ -119,6 +119,9 @@ Instead, we estimate the allele frequency of peptides (GVPs) directly in the pro
 
 where *have* means that the GVP is a substring of at least one of their proteins and it is cleavable by trypsin.
 
+<br>
+
+The population genetic data we provide is from gnomAD, and we use the population labels available [here](https://gnomad.broadinstitute.org/news/2018-10-gnomad-v2-1/). Note that we are restricted to those populations that are publically available (so not all populations are available)
 
 
 <br>
