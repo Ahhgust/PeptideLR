@@ -387,11 +387,6 @@ def parser_main(argv):
     print("Problem finding the LR calculator...", file=sys.stderr)
     return 1
   
-  outdir = results.O
-  if outdir == '':
-    if results.D=='-':
-      outdir='out'
-
   if results.D != "-" and not os.path.isfile(results.D):
     print("File: " , results.D , " cannot be found. Maybe there's a typo in the name?", file=sys.stderr)
     exit(1)
@@ -404,11 +399,22 @@ def parser_main(argv):
     outdir = os.path.splitext(os.path.basename(results.D))[0]
     if outdir.find(".") != -1:
       outdir = os.path.splitext(outdir)[0]
-    
+    else:
+      outdir += "_out"
+      
   else:
     fh = open(results.D, "r")
     outdir = os.path.splitext(os.path.basename(results.D))[0]
+    if outdir.find(".") == -1: # hoo-ray for the case of no file extension..
+      outdir += "_out"
+    
 
+  if results.O != '':
+    outdir = results.O
+
+
+
+      
   if results.N not in suffixArraysAndMore:
     print("Cannot find the null/reference suffix array: ", results.N, " Run\n", argv[0] , " --ls \nto list all suffix arrays", file=sys.stderr)
     exit(1)
