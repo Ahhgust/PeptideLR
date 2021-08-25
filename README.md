@@ -114,7 +114,7 @@ It is a reasonable bet that many of these proteins correspond to alternative tra
 This utility can also be used to estimate the peptide allele frequency. Even though the GVPs that we are searching for have a basis in the genome (they overlap some number of SNPs), estimating the GVP allele frequency can be tricky. For instance, if you have a biallelic non-synonymous SNP, any other protein-altering SNP that lands in the same region (regardless if you're looking for that SNP) will impact the frequency (generally lower) of one or both of the GVPs sought. Hard examples are when the GVP is multi-copy (within the same chromosome), in which case there is no way to estimate the allele frequency unless you know which SNPs cause the formation of the GVP *and* you know the co-variance (that is, which haploid individuals have both alleles). 
 Instead, we estimate the allele frequency of peptides (GVPs) directly in the protein sequences to circumvent these issues. Namely, we consider:
 
-&#U22C3; (all haploid individuals that have some GVP) 
+| *union*(all haploid individuals that have some GVP)  |
 
 <br>
 
