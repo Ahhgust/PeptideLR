@@ -117,6 +117,9 @@ Instead, we estimate the allele frequency of peptides (GVPs) directly in the pro
 | *union*(all haploid individuals that have some GVP)  |
 
 <br>
+where *have* means that the GVP is a substring of at least one of their proteins and it is cleavable by trypsin.
+
+<br>
 
 # RMP
 
