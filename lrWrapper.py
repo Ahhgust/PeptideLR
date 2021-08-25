@@ -148,7 +148,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
     for pep in detects[chrom]:
       pep2chrom[pep] = chrom
 
-    for population in args.P:
+    for population in [args.P]:
       filename = os.path.join(outdir, "Panels", "panel." + population + "." + chrom)
       if population == 'Total':
         panelFiles[(population, chrom)] = "-W -a " + filename
@@ -327,7 +327,7 @@ def buildArgvParser(parser):
   parser.add_argument('-r', '--rmp', dest='R', help="Computes the RMP", action='store_true')
   parser.add_argument('-l', '--likelihoods', dest='L', help="Computes likelihoods for L contributors", type=int, default=0)
   parser.add_argument('-w', '--w_likelihoods', dest='W', help="Computes the likelihood of Woerner et al.", type=int, default=0)
-  parser.add_argument('-p', '--population', dest='P', help="Sets the reference population (P) in the likelihood estimation. Defaults to pooled frequencies (Total)", type=str, nargs="+", default=["Total"])
+  parser.add_argument('-p', '--population', dest='P', help="Sets the reference population (P) in the likelihood estimation. Defaults to pooled frequencies (Total)", type=str, default="Total")
   parser.add_argument('-t', '--theta', dest='T', help="Turns on the theta-correction", default=MIN_THETA)
   parser.add_argument('-d', '--detects', dest='D', help="A file with the peptide detections...", default="-")
   parser.add_argument('-P', '--detects_peptide_colname', dest="pepcol", help="In -D, the column name for the peptide detections", default='Peptide')
@@ -412,9 +412,7 @@ def parser_main(argv):
   if results.O != '':
     outdir = results.O
 
-
-
-      
+    
   if results.N not in suffixArraysAndMore:
     print("Cannot find the null/reference suffix array: ", results.N, " Run\n", argv[0] , " --ls \nto list all suffix arrays", file=sys.stderr)
     exit(1)
@@ -438,7 +436,7 @@ def parser_main(argv):
     
   refArray = suffixArraysAndMore[ results.N ]
   otherPops = False
-  if len(results.P) > 1 or results.P[0] != 'Total':
+  if results.P != 'Total':
     otherPops=True
     
   if results.WhichPops or otherPops:
@@ -463,13 +461,9 @@ def parser_main(argv):
     if not otherPops:
       exit(0)
     else:
-      errs=0
-      for pop in results.P:
-        if pop != "Total" and pop not in d:
-          errs+=1
-          print("Cannot find population: ", pop, file=sys.stderr)
 
-      if errs:
+      if results.P != "Total" and results.P not in d:
+        print("Cannot find population: ", pop, file=sys.stderr)
         print("One or more errors detected... the available populations are" , "\n".join(d), file=sys.stderr)
         exit(1)
           

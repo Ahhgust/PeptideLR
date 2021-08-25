@@ -297,7 +297,7 @@ def summarizePanel(peptides, suffixarrayObject, samps2pops, verbose=False):
 
   popTots = {} # pop -> total sample size of population
   pepCounts = {} # peptide -> popuation -> count 
-  if verbose and samps2pops is not None:
+  if samps2pops is not None:
     # who is a haploid ID (ID + _MATERNAL_SUFFIX)
     for who in whos:
       dipID = who[:-2]
@@ -309,13 +309,14 @@ def summarizePanel(peptides, suffixarrayObject, samps2pops, verbose=False):
           popTots[pop] += 1
   
   curMat = search.getNextMatch()
-  if verbose and samps2pops is None:
+  
+  if verbose:
     print("Population", "Peptide", "Peptide20AA", "AlleleCount", "Total", "AlleleFrequency", "Whos", sep="\t")
   else:
     print("Population", "Peptide", "Peptide20AA", "AlleleCount", "Total", "AlleleFrequency", sep="\t")
 
   popsOrdered = sorted(popTots.keys()) # fix the population ordering...
-  
+
   # walk through the peptide detections (once)
   # report the pooled allele frequency
   i=0
@@ -325,33 +326,37 @@ def summarizePanel(peptides, suffixarrayObject, samps2pops, verbose=False):
     i += 1
     curOwn = curMat.getFullPeptideOwnership()
 
-    if not verbose:
+    if samps2pops is None:
       print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), sep="\t")
-    elif verbose and samps2pops is not None:
-      print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), sep="\t")
+        
+    else:
       # initialize all population counts to 0
-      pepCounts[pepSought]={}
       for pop in popsOrdered:
-        pepCounts[pop]=0
-      
-      for own in curOwn:
-        dipID = own[:-2]
-        if dipID in samps2pops:
-          pop = samps2pops[dipID]
-          pepCounts[pop] += 1
-          
-      for pop in popsOrdered:
-        print(pop, curPep, pepSought, pepCounts[pop], popTots[pop], (pepCounts[pop]+0.5)/(popTots[pop]+1) ,sep="\t")
+        pepCounts[pop]=set()
 
-    elif verbose and samps2pops is None:
-      dips= set()
+      dips= set() # for the total...
+      
       for own in curOwn:
         dipID = own[:-2]
         dips.add(dipID)
+        if dipID in samps2pops:
+          pop = samps2pops[dipID]
+          pepCounts[pop].add(own)
+          
+      for pop in popsOrdered:
+        if verbose:
+          owns = sorted(list(pepCounts[pop]))
+          print(pop, curPep, pepSought, len(pepCounts[pop]), popTots[pop], (len(pepCounts[pop])+0.5)/(popTots[pop]+1), ";".join(owns), sep="\t")
+        else:
+          print(pop, curPep, pepSought, len(pepCounts[pop]), popTots[pop], (len(pepCounts[pop])+0.5)/(popTots[pop]+1),sep="\t")
+
 
       owns = sorted(list(dips))
-      print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), ";".join(owns), sep="\t")
-      
+      if verbose:
+        print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), ";".join(owns), sep="\t")
+      else:
+        print("Total", curPep, pepSought, len(curOwn), len(whos), (len(curOwn)+0.5)/(len(whos)+1), sep="\t")
+        
     curMat = search.getNextMatch()
     
   
@@ -1613,8 +1618,9 @@ def peptide_main(argv):
   pops2samps=None
     
   if results.Summaries or results.Full or results.ProtGenom:
-    if samps2pops is None and not (results.Summaries or results.Full):
+    if samps2pops is None:
       (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
+
     if results.ProtGenom:
       proteoGenomicLookup(peptidePanel, saObject, samps2pops)
     else:
