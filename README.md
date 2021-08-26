@@ -143,31 +143,31 @@ The likelihood ratio formulation of `lrWrapper.py`
   -l L, --likelihoods L
                         Computes likelihoods for 1..L contributors   <br>
   -p P, --population P  Sets the reference population (P) in the likelihood
-                        estimation. See -W. Defaults to pooled frequencies (Total)
-  -t T, --theta T       Turns on the theta-correction
-  -d D, --detects D     A file with the peptide detections...
+                        estimation. See -W. Defaults to pooled frequencies (Total) <br>
+  -t T, --theta T       Turns on the theta-correction <br>
+  -d D, --detects D     A file with the peptide detections... <br>
   -P PEPCOL, --detects_peptide_colname PEPCOL
-                        In -D, the column name for the peptide detections
+                        In -D, the column name for the peptide detections <br>
   -C CHROMCOL, --detects_chromosome_colname CHROMCOL
                         In -C, the column name for the chromosome (or any
-                        categorical variable used to partition the detections)
+                        categorical variable used to partition the detections) <br>
   -F FREQCOL, --detects_frequency_colname FREQCOL
                         Rather than using population-specific frequencies use
                         those defined in the column specified in the detects
-                        file
+                        file <br>
   -M M, --monte_carlo_sims M
-                        Number of Monte Carlo simulations
+                        Number of Monte Carlo simulations <br>
   -q, --query_allele_frequencies
-                        Computes allele frequencies on --detects
-  -g, --genomic         Generates genomic information on peptides
-  -n N, --null_array N  The null/reference array. Default: HG38_Clean
-  -a A, --alt_array A   The comparison array
+                        Computes allele frequencies on --detects <br>
+  -g, --genomic         Generates genomic information on peptides <br>
+  -n N, --null_array N  The null/reference array. Default: HG38_Clean <br>
+  -a A, --alt_array A   The comparison array <br>
   -o O, --output_directory O
-                        The directory where the analysis is conducted
+                        The directory where the analysis is conducted <br>
   -c C, --n_cpus C      The number of CPUs (degree of multi-processing) used.
-                        Only applies to RMP/LR calculation
-  -L, --ls              Lists the suffix arrays in the default directory
-  -W, --which_pops      Lists the populations available in the suffix array
+                        Only applies to RMP/LR calculation <br>
+  -L, --ls              Lists the suffix arrays in the default directory <br>
+  -W, --which_pops      Lists the populations available in the suffix array <br>
 
 
 
