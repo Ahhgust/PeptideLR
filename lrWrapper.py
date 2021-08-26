@@ -325,9 +325,9 @@ def buildArgvParser(parser):
   Name says it all. Processes command line arguments"
   """
   parser.add_argument('-r', '--rmp', dest='R', help="Computes the RMP", action='store_true')
-  parser.add_argument('-l', '--likelihoods', dest='L', help="Computes likelihoods for L contributors", type=int, default=0)
+  parser.add_argument('-l', '--likelihoods', dest='L', help="Computes likelihoods for 1..L contributors", type=int, default=0)
   parser.add_argument('-w', '--w_likelihoods', dest='W', help="Computes the likelihood of Woerner et al.", type=int, default=0)
-  parser.add_argument('-p', '--population', dest='P', help="Sets the reference population (P) in the likelihood estimation. Defaults to pooled frequencies (Total)", type=str, default="Total")
+  parser.add_argument('-p', '--population', dest='P', help="Sets the reference population (P) in the likelihood estimation. See -W. Defaults to pooled frequencies (Total)", type=str, default="Total")
   parser.add_argument('-t', '--theta', dest='T', help="Turns on the theta-correction", default=MIN_THETA)
   parser.add_argument('-d', '--detects', dest='D', help="A file with the peptide detections...", default="-")
   parser.add_argument('-P', '--detects_peptide_colname', dest="pepcol", help="In -D, the column name for the peptide detections", default='Peptide')

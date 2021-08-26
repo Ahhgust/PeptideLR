@@ -1,4 +1,4 @@
-#
+>#
 
 The package herein can be used to compute a semi-continuous likelihood ratio [(to know more about what that is and how we do it, click here!)](about.md) using peptides detected by [liquid chromatography tandem mass spectrometry](https://en.wikipedia.org/wiki/Liquid_chromatography%E2%80%93mass_spectrometry) (LC-MS/MS). \
 It can also be used to compute some genomic properties of peptides. Namely, where in the genome they might be found. Of importance, this query is done on a population database; so long as the allele is present (in at least one individual in the database) it is query-able. 
@@ -116,7 +116,6 @@ Instead, we estimate the allele frequency of peptides (GVPs) directly in the pro
 
 ( | *union*(all haploid individuals that have some GVP)  | + 0.5) / ( number of diploid individuals + 1)
 
-
 where *have* means that the GVP is a substring of at least one of their proteins and it is cleavable by trypsin.
 
 <br>
@@ -133,6 +132,45 @@ The population genetic data we provide is from gnomAD, and we use the population
 `lrWrapper.py -d peptides.tsv -n HG38_Clean -r`
 
 The likelihood ratio formulation of `lrWrapper.py`
+
+
+
+
+## All options
+
+  -h, --help            show this help message and exit
+  -r, --rmp             Computes the [RMP](https://doi.org/10.1016/j.fsigen.2020.102295)
+  -l L, --likelihoods L
+                        Computes likelihoods for 1..L contributors
+  -p P, --population P  Sets the reference population (P) in the likelihood
+                        estimation. See -W. Defaults to pooled frequencies (Total)
+  -t T, --theta T       Turns on the theta-correction
+  -d D, --detects D     A file with the peptide detections...
+  -P PEPCOL, --detects_peptide_colname PEPCOL
+                        In -D, the column name for the peptide detections
+  -C CHROMCOL, --detects_chromosome_colname CHROMCOL
+                        In -C, the column name for the chromosome (or any
+                        categorical variable used to partition the detections)
+  -F FREQCOL, --detects_frequency_colname FREQCOL
+                        Rather than using population-specific frequencies use
+                        those defined in the column specified in the detects
+                        file
+  -M M, --monte_carlo_sims M
+                        Number of Monte Carlo simulations
+  -q, --query_allele_frequencies
+                        Computes allele frequencies on --detects
+  -g, --genomic         Generates genomic information on peptides
+  -n N, --null_array N  The null/reference array. Default: HG38_Clean
+  -a A, --alt_array A   The comparison array
+  -o O, --output_directory O
+                        The directory where the analysis is conducted
+  -c C, --n_cpus C      The number of CPUs (degree of multi-processing) used.
+                        Only applies to RMP/LR calculation
+  -L, --ls              Lists the suffix arrays in the default directory
+  -W, --which_pops      Lists the populations available in the suffix array
+
+
+
 
 
 
