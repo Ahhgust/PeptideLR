@@ -138,10 +138,10 @@ The likelihood ratio formulation of `lrWrapper.py`
 
 ## All options
 
-  -h, --help            show this help message and exit
-  -r, --rmp             Computes the [RMP](https://doi.org/10.1016/j.fsigen.2020.102295)
+  -h, --help            show this help message and exit <br>
+  -r, --rmp             Computes the [RMP](https://doi.org/10.1016/j.fsigen.2020.102295) <br>
   -l L, --likelihoods L
-                        Computes likelihoods for 1..L contributors
+                        Computes likelihoods for 1..L contributors   <br>
   -p P, --population P  Sets the reference population (P) in the likelihood
                         estimation. See -W. Defaults to pooled frequencies (Total)
   -t T, --theta T       Turns on the theta-correction
