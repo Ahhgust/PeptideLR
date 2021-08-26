@@ -13,6 +13,8 @@ It can also be used to compute some genomic properties of peptides. Namely, wher
 * Python 3.*
   * Numpy
   * joblib
+* R
+  * tidyverse
 
 * Compute recommendations
   * ~65 Gb of storage (to store the ~4000 whole proteomes)
@@ -36,9 +38,11 @@ chmod +x Buildit_x64_linux.sh && ./Buildit_x64_linux.sh && ln -s $PWD/pywrap/suf
 cd ..
 mkdir ProtengineR3 && cd ProtengineR3 && wget -O ProtengineR3.zip 'https://www.dropbox.com/sh/xp3wzs5fy9taqvl/AADjmPYTT201_MPtNXjVEZuaa?dl=1'
 unzip ProtengineR3.zip
+cd ProtengineR3
 for file in *.tbz; do tar -xf $file && rm $file & done
 wait
 cd ..
+ln -s $PWD/protengine ProtengineR3/zproj_profinman
 if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 ```
 <br>
@@ -132,7 +136,9 @@ The population genetic data we provide is from gnomAD, and we use the population
 `lrWrapper.py -d peptides.tsv -n HG38_Clean -r`
 
 Specifying -r computes the [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295) <br>
-Wherein it computes the RMP at the level of the chromosome, and combines these probabilities by taking products.
+Wherein it computes the RMP at the level of the chromosome, and combines these probabilities by taking products. RMPs (and likelihoods) <br>
+are computed in parallel (control with -c) and then combined (RMPs/CombinedRMP.tsv).
+It is important to remember what the RMP means in this context-- it is useful for saying how rare a collection of GVPs are in a single-source sample. It cannot be used, however, to associate a person to some piece of evidence. For that, a likelihood ratio is more appropriate.
 
 # Likelihood
 

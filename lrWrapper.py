@@ -397,7 +397,7 @@ def parser_main(argv):
   elif results.D.endswith(".gz"):
     fh= gzip.open(results.D, "rt")
     outdir = os.path.splitext(os.path.basename(results.D))[0]
-    if outdir.find(".") != -1:
+    if os.path.basename(results.D).find(".") == -1: # hoo-ray for the case of no file extension..
       outdir = os.path.splitext(outdir)[0]
     else:
       outdir += "_out"
@@ -405,9 +405,9 @@ def parser_main(argv):
   else:
     fh = open(results.D, "r")
     outdir = os.path.splitext(os.path.basename(results.D))[0]
-    if outdir.find(".") == -1: # hoo-ray for the case of no file extension..
+    if os.path.basename(results.D).find(".") == -1: # hoo-ray for the case of no file extension..
       outdir += "_out"
-    
+
 
   if results.O != '':
     outdir = results.O
