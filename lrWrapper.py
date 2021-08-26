@@ -256,7 +256,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
       command += " -1"
     else:
       command += " -N " + str(args.L)
-      
+    
     for block in detects:
       for pop in [args.P]:
         outfile = outfileBase + "." + pop + "." + block
