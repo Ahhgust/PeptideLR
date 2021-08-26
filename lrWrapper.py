@@ -221,7 +221,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
     
     for block in detects:
 
-      for pop in args.P:
+      for pop in [args.P]:
         outfile = outfileBase + "." + pop + "." + block
         append = ""
         rmpFiles.append(outfile)
@@ -258,7 +258,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
       command += " -N " + str(args.L)
       
     for block in detects:
-      for pop in args.P:
+      for pop in [args.P]:
         outfile = outfileBase + "." + pop + "." + block
         append = ""
         likeFiles.append(outfile)
@@ -281,7 +281,7 @@ def makeCommands(profinman, pepLR, combiner, args, detects, outdir, nullArray, a
 
     command = pepLRCommand + " -p " + detectsFile + " -Y " + os.path.join(outdir, args.A) + " -W -a - -L " + altArray + " -g " + str(args.W)
     outfileBase = os.path.join(outdir, "LRs", "LR."+ str(args.W))
-    for pop in args.P:
+    for pop in [args.P]:
       outfile = outfileBase + "." + pop + ".genomic"
       append = ""
 

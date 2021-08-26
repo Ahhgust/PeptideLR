@@ -131,8 +131,12 @@ The population genetic data we provide is from gnomAD, and we use the population
 
 `lrWrapper.py -d peptides.tsv -n HG38_Clean -r`
 
-The likelihood ratio formulation of `lrWrapper.py`
+Specifying -r computes the [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295) <br>
+Wherein it computes the RMP at the level of the chromosome, and combines these probabilities by taking products.
 
+# Likelihood
+
+The likelihood ratio formulation of `lrWrapper.py`
 
 
 
