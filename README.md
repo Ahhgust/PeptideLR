@@ -38,7 +38,6 @@ chmod +x Buildit_x64_linux.sh && ./Buildit_x64_linux.sh && ln -s $PWD/pywrap/suf
 cd ..
 mkdir ProtengineR3 && cd ProtengineR3 && wget -O ProtengineR3.zip 'https://www.dropbox.com/sh/xp3wzs5fy9taqvl/AADjmPYTT201_MPtNXjVEZuaa?dl=1'
 unzip ProtengineR3.zip
-cd ProtengineR3
 for file in *.tbz; do tar -xf $file && rm $file & done
 wait
 cd ..
