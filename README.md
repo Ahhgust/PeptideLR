@@ -54,8 +54,13 @@ Using the Example/ directory as, well, an example: <br>
   * GRCh38Ref
   * HG38_Clean
   * HG38
+  * (any additional suffix arrays that you've built; if not, check your warning/error messages from the installation)
+* Second, test the calculator itself. From the PeptideLR/ directory, type:
+  *`cd Example`
+  * `lrWrapper.py -n HG38_Clean -a GRCh38Ref -l 1 -r -g -q -p NFE -d peptides.tsv `
 
-
+The above lrWrapper command will compute single-source likelihoods (-l 1), the RMP (-r), give genomic summary stats (-g) and query the allele frequencies (-q) for the peptides given by -d (peptides.tsv). The results will be written to: peptides/. The "null" hypothesis (-n) in this case is used to generate the haplotypes for the random man (HG38_Clean, which gives the clean/passed SNP calls from the 1000 Genomes+HGDP dataset), and the "alternative" hypothesis (-a) is that the contributor is the reference sequence (GRCh38Ref). This is obviously not an appropriate question to consider (for one, the reference is haploid and a composite of several individuals), but it should serve as a jumping off point.
+<br>
 
 ## Walk-through
 The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. To make the code easier to use a wrapper script (`lrWrapper.py`) was made. The wrapper can be used to compute a [semi-continuous likelihood](about.md), [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295), as well as basic assessments of peptide allele frequency and it's proteo-genomic location(s).
