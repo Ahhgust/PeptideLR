@@ -1618,7 +1618,7 @@ def peptide_main(argv):
   pops2samps=None
     
   if results.Summaries or results.Full or results.ProtGenom:
-    if samps2pops is None:
+    if samps2pops is None and results.Q != "":
       (samps2pops, pops2samps) = parseSamps2Pops(results.Q, "Individual ID", "Population")
 
     if results.ProtGenom:

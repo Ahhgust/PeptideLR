@@ -58,6 +58,7 @@ Using the Example/ directory as, well, an example: <br>
 * Second, test the calculator itself. From the `PeptideLR/` directory, type
   * `cd Example`
   * `lrWrapper.py -n HG38_Clean -a GRCh38Ref -l 1 -r -g -q -p NFE -d peptides.tsv `
+    * (the above should take a minute or so to run)
 
 The above lrWrapper command will compute single-source likelihoods (-l 1; -l 2 would consider all single source and two-person mixtures), the RMP (-r), give genomic summary stats (-g) and query the allele frequencies (-q) for the peptides given by -d (peptides.tsv). The results will be written to: peptides/. The "null" hypothesis (-n) in this case is used to generate the haplotypes for the random man (HG38_Clean, which gives the clean/passed SNP calls from the [1000 Genomes + HGDP](https://gnomad.broadinstitute.org/downloads#v3-hgdp-1kg) dataset), and the "alternative" hypothesis (-a) is that the contributor is the reference sequence (GRCh38Ref). This is obviously not an appropriate question to consider (for one, the reference is haploid and a composite of several individuals), but it should serve as a jumping off point.
 <br>
