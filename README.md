@@ -50,7 +50,10 @@ Note, this program can be installed at the system level, but the appropriate (us
 
 ## Quick start
 Using the Example/ directory as, well, an example: <br>
-- First, test that the program was successfully installed. Type: `lrWrapper.py --ls`. This *should* list the currently available suffix arrays. You should see: GRCh38Ref, HG38_Clean and HG38
+* First, test that the program was successfully installed. Type: `lrWrapper.py --ls`. This *should* list the currently available suffix arrays. You should see
+  * GRCh38Ref
+  * HG38_Clean
+  * HG38
 
 
 
