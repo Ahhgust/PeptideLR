@@ -58,7 +58,7 @@ Using the Example/ directory as, well, an example: <br>
 * Second, test the calculator itself. From the `PeptideLR/` directory, type
   * `cd Example`
   * `lrWrapper.py -n HG38_Clean -a GRCh38Ref -l 1 -r -g -q -p NFE -d peptides.tsv `
-    * (the above should take a minute or so to run)
+    * (the above should take a minute or so to run; please forgive the stray "warnings" from the tidyverse)
 
 The above lrWrapper command will compute single-source likelihoods (-l 1; -l 2 would consider all single source and two-person mixtures), the RMP (-r), give genomic summary stats (-g) and query the allele frequencies (-q) for the peptides given by -d (peptides.tsv). The results will be written to: peptides/. The "null" hypothesis (-n) in this case is used to generate the haplotypes for the random man (HG38_Clean, which gives the clean/passed SNP calls from the [1000 Genomes + HGDP](https://gnomad.broadinstitute.org/downloads#v3-hgdp-1kg) dataset), and the "alternative" hypothesis (-a) is that the contributor is the reference sequence (GRCh38Ref). This is obviously not an appropriate question to consider (for one, the reference is haploid and a composite of several individuals), but it should serve as a jumping off point.
 <br>
@@ -156,7 +156,10 @@ It is important to remember what the RMP means in this context-- it is useful fo
 
 # Likelihood
 
-The likelihood ratio formulation of `lrWrapper.py`
+`lrWrapper.py` can be used to estimate a semi-continuous likeihood ratio [(what is this? click here!)](about.md). While the RMP requires a pair of information (the GVPs and some population databaes), the likelihood ratio requires three pieces of information: the GVPs, a population database, and a database of proposed contributors. Additional parameters include the hypothesis, as well as the proposed rates of drop-in and drop-out. The code-base provides an (over)simplified way of considering a hypothesis. Namely, two suffix arrays are given, and the number of individuals in the mixture is proposed (as an upper bound). Then all ways of constructing hypotheses involving that many individuals (or fewer) in constructed. In the simplest case (single source sample, specified with `-l 1`), each person in the contributor suffix array database (specified with `-a`) has the likelihood assessed, as well as the likelihood from the population database (roughly speaking, the mean is taken over all individuals in the database). If a two-person mixture is proposed, all single source likelihoods are assessed, as well as all ways of constructing a 2-person mixture (involving all pairs of known contributors (specified in the array `-a`)), as well as for each contributor plus a random individual, and as well for two random individuals.
+<br>
+
+The likelihoods get written to files in the `LRs/` directory. These files include the likelihoods estimated within a chromosome (using haplotypes), as well as the combined genomic/proteomic LR (CombinedLR.?.tsv, where ? is the number of individuals proposed), wherein the final likelihood is taken by products over chromosomes.
 
 
 
