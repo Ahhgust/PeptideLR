@@ -37,7 +37,7 @@ chmod +x Buildit_x64_linux.sh && ./Buildit_x64_linux.sh && ln -s $PWD/pywrap/suf
 # and grab the public datasets (forgive the dropbox link but these files are BIG!)
 cd ..
 mkdir ProtengineR3 && cd ProtengineR3 && wget -O ProtengineR3.zip 'https://www.dropbox.com/sh/xp3wzs5fy9taqvl/AADjmPYTT201_MPtNXjVEZuaa?dl=1'
-unzip ProtengineR3.zip
+unzip ProtengineR3.zip && rm ProtengineR3.zip
 for file in *.tbz; do tar -xf $file && rm $file & done
 wait
 cd ..
@@ -47,6 +47,12 @@ if [ -d $HOME/bin ]; then ln -s $PWD/lrWrapper.py $HOME/bin; fi
 <br>
 
 Note, this program can be installed at the system level, but the appropriate (user/group/other-readable) location must be used to install the code, and the lrWrapper.py in the bin (e.g., in /usr/bin or /usr/local/bin) **needs to be a symlink**!
+
+## Quick start
+Using the Example/ directory as, well, an example: <br>
+- First, test that the program was successfully installed. Type: `lrWrapper.py --ls`. This *should* list the currently available suffix arrays. You should see: GRCh38Ref, HG38_Clean and HG38
+
+
 
 ## Walk-through
 The code-base is designed to work on peptides, specifically on peptides that are polymorphic in populations. To make the code easier to use a wrapper script (`lrWrapper.py`) was made. The wrapper can be used to compute a [semi-continuous likelihood](about.md), [random match probability](https://doi.org/10.1016/j.fsigen.2020.102295), as well as basic assessments of peptide allele frequency and it's proteo-genomic location(s).
