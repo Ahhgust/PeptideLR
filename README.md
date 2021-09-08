@@ -55,7 +55,7 @@ Using the Example/ directory as, well, an example: <br>
   * HG38_Clean
   * HG38
   * (any additional suffix arrays that you've built; if not, check your warning/error messages from the installation)
-* Second, test the calculator itself. From the PeptideLR/ directory, type:
+* Second, test the calculator itself. From the PeptideLR/ directory, type
   *`cd Example`
   * `lrWrapper.py -n HG38_Clean -a GRCh38Ref -l 1 -r -g -q -p NFE -d peptides.tsv `
 
